@@ -1,5 +1,19 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex, blob } from "drizzle-orm/sqlite-core";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+
+export const blobChunks = sqliteTable(
+	"blob_chunks",
+	{
+		key: text("key").notNull(),
+		chunkIndex: integer("chunk_index").notNull(),
+		contentType: text("content_type"),
+		data: blob("data", { mode: "buffer" }).notNull(),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [uniqueIndex("blob_chunks_key_chunk_idx").on(t.key, t.chunkIndex)],
+);
 
 export const users = sqliteTable("users", {
 	id: text("id").primaryKey(),
@@ -491,6 +505,7 @@ export const backups = sqliteTable(
 );
 
 export const schema = {
+	blobChunks,
 	users,
 	domains,
 	mailboxes,
