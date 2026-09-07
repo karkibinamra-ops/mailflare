@@ -10,7 +10,8 @@ import { getEmailAddress } from "@/lib/email/address";
 import { sendMailboxAutoReply } from "@/lib/email/auto-reply";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import { listMessageAttachments, storeMessageAttachments } from "@/lib/email/attachments";
-import { getUnsubscribeUrlFromRawR2Key } from "@/lib/email/unsubscribe";
+import { getUnsubscribeUrlFromRawBlobKey } from "@/lib/email/unsubscribe";
+import { putBlob, getBlob } from "@/lib/storage/blob";
 import type { SessionUser } from "@/lib/auth/types";
 import {
 	getMailboxNotificationUserIds,
@@ -20,7 +21,7 @@ import {
 export type InboundQueueMessage = {
 	from: string;
 	to: string;
-	rawR2Key: string;
+	rawBlobKey: string;
 	headers?: Record<string, string>;
 };
 
@@ -29,6 +30,7 @@ export async function processInboundMessage(
 	payload: InboundQueueMessage,
 ): Promise<void> {
 	const db = getDb(env);
+
 	// The sender is passed so that sender-based block rules resolve the same way here as they
 	// do in the Worker email handler.
 	const decision = await resolveInboundAddress(db, payload.to, payload.from);
@@ -52,19 +54,23 @@ export async function processInboundMessage(
 
 	if (!decision.mailbox) return;
 
-	const raw = await env.BUCKET.get(payload.rawR2Key);
+	const raw = await getBlob(env, payload.rawBlobKey);
+
 	if (!raw) {
-		console.error(`Missing R2 object: ${payload.rawR2Key}`);
+		console.error(`Missing blob object: ${payload.rawBlobKey}`);
 		return;
 	}
 
-	const buffer = await raw.arrayBuffer();
+	const buffer = raw.data;
 	const parsed = await parseRawMime(buffer);
 	const messageId = newId("msg");
 	const snippet = buildSnippet(parsed.text, parsed.html);
-	const deliveredAddress = getEmailAddress(payload.to) || `${decision.mailbox.localPart}@${decision.mailbox.hostname}`;
+	const deliveredAddress =
+		getEmailAddress(payload.to) ||
+		`${decision.mailbox.localPart}@${decision.mailbox.hostname}`;
 	const toAddr = payload.to;
 	const fromAddr = parsed.fromAddr ?? payload.from;
+
 	const destination = await resolveInboxRuleDestination(db, {
 		mailboxId: decision.mailbox.mailboxId,
 		toAddress: toAddr,
@@ -72,6 +78,7 @@ export async function processInboundMessage(
 		subject: parsed.subject,
 		content: [parsed.text, parsed.html, snippet].filter(Boolean).join(" "),
 	});
+
 	const contact = await upsertContactFromAddress(env, {
 		userId: decision.mailbox.userId,
 		address: fromAddr,
@@ -92,12 +99,14 @@ export async function processInboundMessage(
 			snippet,
 			textBody: parsed.text,
 			htmlBody: parsed.html,
-			rawR2Key: payload.rawR2Key,
+			rawR2Key: payload.rawBlobKey,
 			status: destination.status,
 			threadId: parsed.messageId,
 		});
 
-		await storeMessageAttachments(env, messageId, parsed.attachments, { validate: false });
+		await storeMessageAttachments(env, messageId, parsed.attachments, {
+			validate: false,
+		});
 	} catch (error) {
 		await db.delete(messages).where(eq(messages.id, messageId));
 		throw error;
@@ -114,7 +123,10 @@ export async function processInboundMessage(
 				headers: payload.headers,
 			});
 		} catch (error) {
-			console.error(`Auto-reply failed for mailbox ${decision.mailbox.mailboxId}`, error);
+			console.error(
+				`Auto-reply failed for mailbox ${decision.mailbox.mailboxId}`,
+				error,
+			);
 		}
 	}
 
@@ -123,6 +135,7 @@ export async function processInboundMessage(
 		decision.mailbox.mailboxId,
 		decision.mailbox.userId,
 	);
+
 	await notifyUsersOfNewMessage(env, notificationUserIds, {
 		type: "new_message",
 		messageId,
@@ -131,6 +144,7 @@ export async function processInboundMessage(
 		fromName: contact?.displayName ?? null,
 		subject: parsed.subject,
 	});
+
 	await dispatchWebhooks(env, decision.mailbox.userId, "message.inbound", {
 		messageId,
 		from: fromAddr,
@@ -139,7 +153,7 @@ export async function processInboundMessage(
 	});
 }
 
-export async function storeRawToR2(
+export async function storeRawEmail(
 	env: CloudflareEnv,
 	from: string,
 	to: string,
@@ -147,52 +161,127 @@ export async function storeRawToR2(
 ): Promise<string> {
 	const key = `inbound/${Date.now()}-${newId()}.eml`;
 	const buffer = await new Response(raw).arrayBuffer();
-	await env.BUCKET.put(key, buffer, {
-		httpMetadata: { contentType: "message/rfc822" },
-		customMetadata: { from, to },
-	});
+
+	await putBlob(env, key, buffer, "message/rfc822");
+
 	return key;
 }
 
-export async function getMessageWithBody(env: CloudflareEnv, userId: string, messageId: string) {
+export async function getMessageWithBody(
+	env: CloudflareEnv,
+	userId: string,
+	messageId: string,
+) {
 	const db = getDb(env);
+
 	const [message] = await db
 		.select()
 		.from(messages)
 		.where(eq(messages.id, messageId))
 		.limit(1);
+
 	if (!message || message.userId !== userId) return null;
-	const contactNames = await getMessageContactNames(env, userId, message.fromAddr, message.toAddr);
+
+	const contactNames = await getMessageContactNames(
+		env,
+		userId,
+		message.fromAddr,
+		message.toAddr,
+	);
+
 	const attachments = await listMessageAttachments(env, messageId);
-	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
-	return { message: { ...message, ...contactNames }, body: message, attachments, unsubscribeUrl };
+
+	const unsubscribeUrl = await getUnsubscribeUrlFromRawBlobKey(
+		env,
+		message.rawR2Key,
+	);
+
+	return {
+		message: { ...message, ...contactNames },
+		body: message,
+		attachments,
+		unsubscribeUrl,
+	};
 }
 
-export async function getMessageWithBodyForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {
+export async function getMessageWithBodyForUser(
+	env: CloudflareEnv,
+	user: SessionUser,
+	messageId: string,
+) {
 	const db = getDb(env);
-	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message?.mailboxId) return null;
-	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
-	if (!access?.canRead) return null;
-	const contactNames = await getMessageContactNames(env, message.userId, message.fromAddr, message.toAddr);
-	const attachments = await listMessageAttachments(env, messageId);
-	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
-	return { message: { ...message, ...contactNames }, body: message, attachments, unsubscribeUrl };
-}
 
-export async function getMessageMetadataForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {
-	const db = getDb(env);
 	const [message] = await db
-		.select({ mailboxId: messages.mailboxId, rawR2Key: messages.rawR2Key })
+		.select()
 		.from(messages)
 		.where(eq(messages.id, messageId))
 		.limit(1);
+
 	if (!message?.mailboxId) return null;
-	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
+
+	const access = await getMailboxAccessLevel(
+		db,
+		user,
+		message.mailboxId,
+	);
+
 	if (!access?.canRead) return null;
+
+	const contactNames = await getMessageContactNames(
+		env,
+		message.userId,
+		message.fromAddr,
+		message.toAddr,
+	);
+
+	const attachments = await listMessageAttachments(env, messageId);
+
+	const unsubscribeUrl = await getUnsubscribeUrlFromRawBlobKey(
+		env,
+		message.rawR2Key,
+	);
+
+	return {
+		message: { ...message, ...contactNames },
+		body: message,
+		attachments,
+		unsubscribeUrl,
+	};
+}
+
+export async function getMessageMetadataForUser(
+	env: CloudflareEnv,
+	user: SessionUser,
+	messageId: string,
+) {
+	const db = getDb(env);
+
+	const [message] = await db
+		.select({
+			mailboxId: messages.mailboxId,
+			rawR2Key: messages.rawR2Key,
+		})
+		.from(messages)
+		.where(eq(messages.id, messageId))
+		.limit(1);
+
+	if (!message?.mailboxId) return null;
+
+	const access = await getMailboxAccessLevel(
+		db,
+		user,
+		message.mailboxId,
+	);
+
+	if (!access?.canRead) return null;
+
 	const [attachments, unsubscribeUrl] = await Promise.all([
 		listMessageAttachments(env, messageId),
-		getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key),
+		getUnsubscribeUrlFromRawBlobKey(env, message.rawR2Key),
 	]);
-	return { attachments, unsubscribeUrl };
+
+	return {
+		attachments,
+		unsubscribeUrl,
+	};
 }
