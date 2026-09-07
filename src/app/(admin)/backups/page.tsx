@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   DatabaseBackup,
-  Download,
   Play,
   RefreshCw,
   Save,
@@ -29,7 +28,6 @@ import { Switch } from "@/components/ui/switch";
 import type { BackupItem, BackupSettings } from "./types";
 import {
   WEEKDAYS,
-  downloadBackup,
   fetchBackups,
   formatBackupDate,
   formatBackupSize,
@@ -44,6 +42,7 @@ export default function BackupsPage() {
   const queryClient = useQueryClient();
   const restoreInput = useRef<HTMLInputElement | null>(null);
   const [settings, setSettings] = useState<BackupSettings | null>(null);
+
   const backups = useQuery({
     queryKey: ["backups"],
     queryFn: fetchBackups,
@@ -56,7 +55,9 @@ export default function BackupsPage() {
   });
 
   useEffect(() => {
-    if (backups.data?.settings) setSettings(backups.data.settings);
+    if (backups.data?.settings) {
+      setSettings(backups.data.settings);
+    }
   }, [backups.data?.settings]);
 
   const saveSettings = useMutation({
@@ -77,20 +78,17 @@ export default function BackupsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
   });
 
-  const download = useMutation({ mutationFn: downloadBackup });
   const restore = useMutation({
     mutationFn: restoreBackup,
     onSuccess: () => window.location.assign("/login"),
   });
+
   const error =
     backups.error ||
     saveSettings.error ||
     runBackup.error ||
     deleteBackup.error ||
-    download.error ||
     restore.error;
-  const configuration = backups.data?.configuration;
-  const backupConfigured = configuration?.configured === true;
 
   return (
     <div className="space-y-6">
@@ -100,9 +98,12 @@ export default function BackupsPage() {
             Database Backups
           </h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Export database records through the D1 binding and store them in the configured R2 bucket.
+            Manage database backup settings and restore previously exported
+            backups. Stored backup files are disabled in this R2-free
+            deployment.
           </p>
         </div>
+
         <div className="flex items-center gap-2">
           <Input
             ref={restoreInput}
@@ -112,15 +113,34 @@ export default function BackupsPage() {
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
-              if (!file || !window.confirm("Restore this backup? This replaces all current database records and may sign you out.")) return;
+
+              if (
+                !file ||
+                !window.confirm(
+                  "Restore this backup? This replaces all current database records and may sign you out.",
+                )
+              ) {
+                return;
+              }
+
               restore.mutate(file);
             }}
           />
-          <Button type="button" variant="outline" disabled={restore.isPending} onClick={() => restoreInput.current?.click()}>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={restore.isPending}
+            onClick={() => restoreInput.current?.click()}
+          >
             <Upload className="h-4 w-4" />
             {restore.isPending ? "Restoring..." : "Restore"}
           </Button>
-          <Button onClick={() => runBackup.mutate()} disabled={runBackup.isPending || !backupConfigured}>
+
+          <Button
+            onClick={() => runBackup.mutate()}
+            disabled={runBackup.isPending}
+          >
             <Play className="h-4 w-4" />
             {runBackup.isPending ? "Starting..." : "Back up now"}
           </Button>
@@ -133,187 +153,47 @@ export default function BackupsPage() {
         </p>
       )}
 
-      {configuration && !configuration.configured && (
-        <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
-          <CardHeader className="py-0">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-              <div>
-                <CardTitle className="text-amber-950">
-                  Complete backup setup
-                </CardTitle>
-                <CardDescription className="mt-1 text-amber-800">
-                  Add the missing values under the deployed Worker&apos;s
-                  Variables and Secrets settings. This check disappears after
-                  backup configuration is complete.
-                </CardDescription>
-              </div>
+      <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+        <CardHeader className="py-0">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <CardTitle className="text-amber-950">
+                Stored backup files disabled
+              </CardTitle>
+              <CardDescription className="mt-1 text-amber-800">
+                This deployment does not use Cloudflare R2, so backup files are
+                not stored remotely. Automatic stored backups are disabled.
+              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <div className="flex flex-wrap items-center gap-2">
-              {configuration.missing.map((item) => (
-                <Badge
-                  key={item}
-                  variant="outline"
-                  className="border-amber-300 bg-white/70 text-amber-900"
-                >
-                  {item}
-                </Badge>
-              ))}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="ml-auto border-amber-300 bg-white/70"
-                disabled={backups.isFetching}
-                onClick={() => void backups.refetch()}
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${backups.isFetching ? "animate-spin" : ""}`}
-                />
-                Check again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardHeader>
+      </Card>
 
       <Card className="rounded-3xl border-0 bg-white p-6">
         <CardHeader className="py-0">
           <CardTitle>Automatic backup</CardTitle>
           <CardDescription>
-            The schedule runs at 02:00 UTC. Monthly schedules are limited to
-            days 1-28.
+            Automatic stored backups are disabled in R2-free mode.
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-5 pt-5">
           {settings && (
             <>
               <div className="flex items-center gap-3 text-sm font-medium">
                 <Switch
-                  checked={settings.enabled}
-                  onCheckedChange={(enabled) =>
-                    setSettings({ ...settings, enabled })
-                  }
-                  aria-label="Enable automatic backups"
+                  checked={false}
+                  disabled
+                  aria-label="Automatic backups disabled"
                 />
-                <span>Enable automatic backups</span>
+                <span>Automatic backups disabled</span>
               </div>
 
-              {settings.enabled && (
-                <>
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="schedule-type">Frequency</Label>
-                      <Select
-                        id="schedule-type"
-                        value={settings.scheduleType}
-                        onChange={(event) => {
-                          const scheduleType = event.target
-                            .value as BackupSettings["scheduleType"];
-                          setSettings({
-                            ...settings,
-                            scheduleType,
-                            scheduleValue:
-                              scheduleType === "weekly"
-                                ? 1
-                                : scheduleType === "monthly"
-                                  ? 1
-                                  : null,
-                          });
-                        }}
-                        className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm"
-                      >
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Selected day of week</option>
-                        <option value="monthly">Selected day of month</option>
-                      </Select>
-                    </div>
-
-                    {settings.scheduleType === "weekly" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="weekday">Day of week</Label>
-                        <Select
-                          id="weekday"
-                          value={settings.scheduleValue ?? 1}
-                          onChange={(event) =>
-                            setSettings({
-                              ...settings,
-                              scheduleValue: Number(event.target.value),
-                            })
-                          }
-                          className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm"
-                        >
-                          {WEEKDAYS.map((day) => (
-                            <option key={day.value} value={day.value}>
-                              {day.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                    )}
-
-                    {settings.scheduleType === "monthly" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="month-day">Day of month</Label>
-                        <Input
-                          id="month-day"
-                          type="number"
-                          min={1}
-                          max={28}
-                          value={settings.scheduleValue ?? 1}
-                          onChange={(event) =>
-                            setSettings({
-                              ...settings,
-                              scheduleValue: Number(event.target.value),
-                            })
-                          }
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid gap-4 border-t border-neutral-100 pt-5">
-                    <div className="flex items-center gap-3 text-sm font-medium">
-                      <Switch
-                        checked={settings.retentionEnabled}
-                        onCheckedChange={(retentionEnabled) =>
-                          setSettings({
-                            ...settings,
-                            retentionEnabled,
-                          })
-                        }
-                        aria-label="Delete old backups automatically"
-                      />
-                      <span>Delete old backups automatically</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="retention-days">
-                        Delete backups older than
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="retention-days"
-                          type="number"
-                          min={1}
-                          max={3650}
-                          value={settings.retentionDays}
-                          disabled={!settings.retentionEnabled}
-                          onChange={(event) =>
-                            setSettings({
-                              ...settings,
-                              retentionDays: Number(event.target.value),
-                            })
-                          }
-                        />
-                        <span className="text-sm text-neutral-500">days</span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
+              <p className="text-sm text-neutral-500">
+                Backup scheduling is kept in the interface for compatibility,
+                but no backup files will be written to R2.
+              </p>
 
               <Button
                 onClick={() => saveSettings.mutate()}
@@ -332,50 +212,66 @@ export default function BackupsPage() {
           <DatabaseBackup className="h-5 w-5 text-neutral-500" />
           <h2 className="font-semibold text-neutral-900">Backup history</h2>
         </div>
-        <div className="grid grid-cols-[1fr_110px_110px_170px_120px] gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+
+        <div className="grid grid-cols-[1fr_110px_110px_170px_80px] gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
           <span>File</span>
           <span>Status</span>
           <span>Size</span>
           <span>Created</span>
           <span>Actions</span>
         </div>
+
         {backups.isLoading && <SkeletonRows count={5} />}
-        {!backups.isLoading && (backups.data?.backups ?? []).length === 0 && (
-          <p className="px-4 py-6 text-sm text-neutral-500">No backups yet.</p>
-        )}
+
+        {!backups.isLoading &&
+          (backups.data?.backups ?? []).length === 0 && (
+            <p className="px-4 py-6 text-sm text-neutral-500">
+              No backups yet.
+            </p>
+          )}
+
         {(backups.data?.backups ?? []).map((backup: BackupItem) => (
           <div
             key={backup.id}
-            className="grid grid-cols-[1fr_110px_110px_170px_120px] items-center gap-4 border-b border-neutral-100 px-4 py-3 last:border-b-0"
+            className="grid grid-cols-[1fr_110px_110px_170px_80px] items-center gap-4 border-b border-neutral-100 px-4 py-3 last:border-b-0"
           >
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-neutral-900">
                 {backup.filename ?? backup.id}
               </p>
+
               <p className="truncate text-xs text-neutral-500">
                 {backup.trigger === "manual" ? "Manual" : "Scheduled"}
                 {backup.error ? `: ${backup.error}` : ""}
               </p>
             </div>
-            <Badge variant="outline" className={getStatusClass(backup.status)}>
+
+            <Badge
+              variant="outline"
+              className={getStatusClass(backup.status)}
+            >
               {backup.status}
             </Badge>
+
             <span className="text-sm text-neutral-600">
               {formatBackupSize(backup.size)}
             </span>
+
             <span className="text-sm text-neutral-600">
               {formatBackupDate(backup.createdAt)}
             </span>
+
             <div className="flex gap-1">
               <Button
                 size="sm"
                 variant="ghost"
                 title="Download backup"
-                disabled={backup.status !== "completed" || download.isPending}
-                onClick={() => download.mutate(backup)}
+                disabled
+                aria-label="Download backup disabled"
               >
-                <Download className="h-4 w-4" />
+                <span className="text-xs text-neutral-400">N/A</span>
               </Button>
+
               <Button
                 size="sm"
                 variant="ghost"
