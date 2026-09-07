@@ -7,16 +7,22 @@ import { BACKUP_SETTINGS_ID, getUtcDayBounds, isBackupDue } from "./utils";
 
 export async function getBackupSettings(env: CloudflareEnv) {
 	const db = getDb(env);
+
 	const [settings] = await db
 		.select()
 		.from(backupSettings)
 		.where(eq(backupSettings.id, BACKUP_SETTINGS_ID))
 		.limit(1);
+
 	return settings;
 }
 
 export async function listBackups(env: CloudflareEnv) {
-	return getDb(env).select().from(backups).orderBy(desc(backups.createdAt)).limit(100);
+	return getDb(env)
+		.select()
+		.from(backups)
+		.orderBy(desc(backups.createdAt))
+		.limit(100);
 }
 
 export async function createBackupRecord(
@@ -25,33 +31,55 @@ export async function createBackupRecord(
 	createdByUserId?: string,
 ) {
 	const id = newId("bak");
+
 	await getDb(env).insert(backups).values({
 		id,
 		trigger,
 		createdByUserId: createdByUserId ?? null,
 	});
+
 	return id;
 }
 
-export async function createScheduledBackupIfDue(env: CloudflareEnv, now: Date): Promise<string | null> {
+export async function createScheduledBackupIfDue(
+	env: CloudflareEnv,
+	now: Date,
+): Promise<string | null> {
 	const settings = await getBackupSettings(env);
+
 	if (!settings?.enabled) return null;
-	if (!isBackupDue(settings.scheduleType as BackupScheduleType, settings.scheduleValue, now)) return null;
+
+	if (
+		!isBackupDue(
+			settings.scheduleType as BackupScheduleType,
+			settings.scheduleValue,
+			now,
+		)
+	) {
+		return null;
+	}
 
 	const { start, end } = getUtcDayBounds(now);
+
 	const existing = await getDb(env)
 		.select({ id: backups.id })
 		.from(backups)
 		.where(
 			and(
 				eq(backups.trigger, "scheduled"),
-				inArray(backups.status, ["queued", "running", "completed"]),
+				inArray(backups.status, [
+					"queued",
+					"running",
+					"completed",
+				]),
 				gte(backups.createdAt, new Date(start)),
 				lt(backups.createdAt, new Date(end)),
 			),
 		)
 		.limit(1);
+
 	if (existing.length) return null;
+
 	return createBackupRecord(env, "scheduled");
 }
 
@@ -67,18 +95,33 @@ export async function updateBackupSettings(
 ) {
 	await getDb(env)
 		.update(backupSettings)
-		.set({ ...input, updatedAt: new Date() })
+		.set({
+			...input,
+			updatedAt: new Date(),
+		})
 		.where(eq(backupSettings.id, BACKUP_SETTINGS_ID));
 }
 
-export async function deleteBackup(env: CloudflareEnv, id: string): Promise<boolean> {
+export async function deleteBackup(
+	env: CloudflareEnv,
+	id: string,
+): Promise<boolean> {
 	const db = getDb(env);
-	const [backup] = await db.select().from(backups).where(eq(backups.id, id)).limit(1);
+
+	const [backup] = await db
+		.select()
+		.from(backups)
+		.where(eq(backups.id, id))
+		.limit(1);
+
 	if (!backup) return false;
+
 	if (backup.status === "queued" || backup.status === "running") {
 		throw new Error("A backup in progress cannot be deleted");
 	}
-	if (backup.r2Key) await env.BUCKET.delete(backup.r2Key);
+
+	// R2 storage is disabled, so there is no external backup object to delete.
 	await db.delete(backups).where(eq(backups.id, id));
+
 	return true;
 }
