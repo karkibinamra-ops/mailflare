@@ -1,4 +1,5 @@
 import type { UnsubscribeUrl } from "@/lib/email/unsubscribe-types";
+import { getBlobPrefix } from "@/lib/storage/blob";
 
 const maxHeaderBytes = 64 * 1024;
 const allowedUnsubscribeProtocols = new Set(["http:", "https:", "mailto:"]);
@@ -48,23 +49,44 @@ function isAllowedUnsubscribeUrl(value: string): boolean {
 }
 
 function getCandidates(value: string): string[] {
-	const bracketed = [...value.matchAll(/<([^>]+)>/g)].map((match) => normalizeCandidate(match[1] ?? ""));
+	const bracketed = [...value.matchAll(/<([^>]+)>/g)].map((match) =>
+		normalizeCandidate(match[1] ?? ""),
+	);
+
 	const bare = value.split(",").map(normalizeCandidate);
+
 	return [...bracketed, ...bare].filter(Boolean);
 }
 
-export function extractUnsubscribeUrlFromRaw(raw: ArrayBuffer): UnsubscribeUrl {
+export function extractUnsubscribeUrlFromRaw(
+	raw: ArrayBuffer,
+): UnsubscribeUrl {
 	const headers = parseHeaders(getHeaderBlock(raw));
 	const values = headers.get("list-unsubscribe") ?? [];
-	const candidates = values.flatMap(getCandidates).filter(isAllowedUnsubscribeUrl);
-	return candidates.find((candidate) => candidate.startsWith("https://") || candidate.startsWith("http://"))
-		?? candidates.find((candidate) => candidate.startsWith("mailto:"))
-		?? null;
+	const candidates = values
+		.flatMap(getCandidates)
+		.filter(isAllowedUnsubscribeUrl);
+
+	return (
+		candidates.find(
+			(candidate) =>
+				candidate.startsWith("https://") ||
+				candidate.startsWith("http://"),
+		) ??
+		candidates.find((candidate) => candidate.startsWith("mailto:")) ??
+		null
+	);
 }
 
-export async function getUnsubscribeUrlFromRawR2Key(env: CloudflareEnv, rawR2Key: string | null): Promise<UnsubscribeUrl> {
-	if (!rawR2Key) return null;
-	const raw = await env.BUCKET.get(rawR2Key, { range: { offset: 0, length: maxHeaderBytes } });
+export async function getUnsubscribeUrlFromRawBlobKey(
+	env: CloudflareEnv,
+	rawBlobKey: string | null,
+): Promise<UnsubscribeUrl> {
+	if (!rawBlobKey) return null;
+
+	const raw = await getBlobPrefix(env, rawBlobKey, maxHeaderBytes);
+
 	if (!raw) return null;
-	return extractUnsubscribeUrlFromRaw(await raw.arrayBuffer());
+
+	return extractUnsubscribeUrlFromRaw(raw);
 }
