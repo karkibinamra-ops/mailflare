@@ -4,91 +4,105 @@
 	"main": "./worker.ts",
 	"compatibility_date": "2026-05-20",
 	"keep_vars": true,
+
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
+
 	"assets": {
 		"binding": "ASSETS",
-		"directory": ".open-next/assets",
+		"directory": ".open-next/assets"
 	},
+
 	"images": {
-		"binding": "IMAGES",
+		"binding": "IMAGES"
 	},
+
 	"services": [
 		{
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "mailflare",
-		},
+			"service": "mailflare"
+		}
 	],
+
 	"durable_objects": {
 		"bindings": [
 			{
 				"name": "REALTIME",
-				"class_name": "RealtimeHub",
-			},
-		],
+				"class_name": "RealtimeHub"
+			}
+		]
 	},
+
 	"migrations": [
 		{
 			"tag": "v1",
 			"new_sqlite_classes": [
-				"RealtimeHub",
-			],
-		},
+				"RealtimeHub"
+			]
+		}
 	],
+
 	"triggers": {
-		"crons": ["0 2 * * *"],
+		"crons": ["0 2 * * *"]
 	},
+
 	"ratelimits": [
 		{
 			"name": "LOGIN_RATE_LIMIT",
 			"namespace_id": "1001",
 			"simple": {
 				"limit": 20,
-				"period": 60,
-			},
-		},
+				"period": 60
+			}
+		}
 	],
+
 	"observability": {
-		"enabled": true,
+		"enabled": true
 	},
+
 	"upload_source_maps": true,
+
 	"send_email": [
 		{
 			"name": "EMAIL",
-			"remote": true,
-		},
+			"remote": true
+		}
 	],
+
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "mailflare",
-			"migrations_dir": "drizzle/migrations",
-		},
+			"database_id": "e6636c39-9463-4226-9fb8-3ccf363086a0",
+			"migrations_dir": "drizzle/migrations"
+		}
 	],
+
 	"queues": {
 		"producers": [
 			{
 				"binding": "INBOUND_QUEUE",
-				"queue": "mailflare-inbound",
+				"queue": "mailflare-inbound"
 			},
 			{
 				"binding": "OUTBOUND_QUEUE",
-				"queue": "mailflare-outbound",
-			},
+				"queue": "mailflare-outbound"
+			}
 		],
 		"consumers": [
 			{
 				"queue": "mailflare-inbound",
 				"max_batch_size": 5,
-				"max_retries": 3,
+				"max_retries": 3
 			},
 			{
 				"queue": "mailflare-outbound",
 				"max_batch_size": 5,
-				"max_retries": 3,
-			},
-		],
-	},
+				"max_retries": 3
+			}
+		]
+	}
 }
