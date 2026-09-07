@@ -11,22 +11,38 @@ export async function GET(
 	{ params }: { params: Promise<{ id: string }> },
 ) {
 	const env = getEnv();
+
 	try {
 		const user = await requireUser(env, request);
 		assertAdmin(user);
+
 		const { id } = await params;
-		const [backup] = await getDb(env).select().from(backups).where(eq(backups.id, id)).limit(1);
-		if (!backup?.r2Key) return NextResponse.json({ error: "Backup file not found" }, { status: 404 });
-		const object = await env.BUCKET.get(backup.r2Key);
-		if (!object) return NextResponse.json({ error: "Backup file not found" }, { status: 404 });
-		return new Response(object.body, {
-			headers: {
-				"Content-Type": "application/sql",
-				"Content-Disposition": `attachment; filename="${backup.filename ?? `${backup.id}.sql`}"`,
-				"Content-Length": String(object.size),
+
+		const [backup] = await getDb(env)
+			.select()
+			.from(backups)
+			.where(eq(backups.id, id))
+			.limit(1);
+
+		// Backup files are not stored in R2 in this deployment.
+		if (!backup || backup.status !== "completed") {
+			return NextResponse.json(
+				{ error: "Backup file not found" },
+				{ status: 404 },
+			);
+		}
+
+		return NextResponse.json(
+			{
+				error:
+					"Stored backup downloads are disabled because this deployment does not use Cloudflare R2.",
 			},
-		});
+			{ status: 404 },
+		);
 	} catch {
-		return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+		return NextResponse.json(
+			{ error: "Forbidden" },
+			{ status: 403 },
+		);
 	}
 }
