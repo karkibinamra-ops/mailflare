@@ -183,6 +183,13 @@
       "when": 1788780000000,
       "tag": "0025_add_blob_chunks",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1788780000001,
+      "tag": "0026_add_api_keys_prefix_index",
+      "breakpoints": true
     }
   ]
 }
