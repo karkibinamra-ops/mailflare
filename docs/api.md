@@ -36,7 +36,7 @@ Send email through `POST /api/v1/send`. Attachments are optional and use Base64-
 }
 ```
 
-The dashboard composer accepts up to 10 attachments, with a 10 MB limit per file and a 20 MB combined limit. Attachment metadata is stored in D1 and file content is stored in R2. Downloads require access to the mailbox containing the message.
+The dashboard composer accepts up to 10 attachments, with a 10 MB limit per file and a 20 MB combined limit. Attachment metadata and file content are both stored in D1 (chunked blob storage), so no R2 bucket is required. Downloads require access to the mailbox containing the message.
 
 ## Real-time updates
 
