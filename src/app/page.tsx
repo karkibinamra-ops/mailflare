@@ -1,35 +1,14 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { authFetch, getClientSessionToken } from "@/lib/auth/client";
 import { getHomeActions, heroMessages, sidebarItems } from "./utils";
 import { ArrowRight, Inbox, Mail, Search, ShieldCheck } from "lucide-react";
-import { useBranding } from "@/components/branding-provider";
+import { HomeActions } from "./home-actions";
+
+export const dynamic = "force-static";
+export const revalidate = false;
 
 export default function HomePage() {
-  const branding = useBranding();
-  const [hasUser, setHasUser] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!getClientSessionToken()) return;
-
-    authFetch("/api/auth/me", { redirectOnUnauthorized: false })
-      .then((response) => {
-        if (!cancelled) setHasUser(response.ok);
-      })
-      .catch(() => {
-        if (!cancelled) setHasUser(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const actions = getHomeActions(hasUser);
+  const actions = getHomeActions(false);
 
   return (
     <div className="min-h-dvh bg-[#f6f8fc] text-neutral-900">
@@ -39,9 +18,9 @@ export default function HomePage() {
           className="flex items-center gap-3"
           aria-label="Email Platform home"
         >
-          <img src={branding.iconUrl} height={32} width={32} alt="" />
+          <img src="/icon-96.png" height={32} width={32} alt="" />
           <span className="text-base font-semibold tracking-tight">
-            {branding.appName}
+            "Mailflare"
           </span>
         </Link>
 
@@ -54,11 +33,7 @@ export default function HomePage() {
 				</nav> */}
 
         <div className="flex items-center gap-2">
-          {actions.map((action) => (
-            <Button key={action.href} variant={action.variant} asChild>
-              <Link href={action.href}>{action.label}</Link>
-            </Button>
-          ))}
+          <HomeActions />
         </div>
       </header>
 
@@ -77,22 +52,7 @@ export default function HomePage() {
               your mailboxes from one quiet workspace built around the message list.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" asChild className="rounded-full px-6">
-                <Link href={actions.at(-1)?.href ?? "/setup"}>
-                  {hasUser ? "Open dashboard" : "Create account"}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                asChild
-                className="rounded-full border-neutral-200 bg-white px-6"
-              >
-                <Link href={hasUser ? "/inbox" : "/login"}>
-                  {hasUser ? "View inbox" : "Log in"}
-                </Link>
-              </Button>
+              <HomeActions hero />
             </div>
           </div>
 
