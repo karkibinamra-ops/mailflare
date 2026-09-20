@@ -25,7 +25,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
   }
 
-  if (await verifyPassword(parsed.newPassword, user.passwordHash)) {
+  if (parsed.currentPassword === parsed.newPassword) {
     return NextResponse.json({ error: "New password must be different from the current password" }, { status: 400 });
   }
 
