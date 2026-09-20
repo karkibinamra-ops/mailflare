@@ -29,13 +29,13 @@ Thanks to mailflare sponsors. Want to support the project? Drop [@hieuSSR](https
 
 ## How it works
 
-Mailflare runs in your Cloudflare account. Email Routing delivers incoming messages to the app, while Cloudflare's email service handles outgoing messages. Your mail data stays in your own D1 database and attachments are stored in your own R2 bucket.
+Mailflare runs in your Cloudflare account. Email Routing delivers incoming messages to the app. Your mail data, attachments, and backups all stay in your own D1 database — no R2 bucket required.
 
 ## How much does it cost?
 
-You can setup Mailflare and receive email for free
+You can set up Mailflare and receive email entirely on Cloudflare's Free plan.
 
-A [Paid Worker](https://developers.cloudflare.com/workers/platform/pricing/) plan ($5/month) is required to send email (and it's recommend to have a smooth experience)
+Sending mail requires either an SMTP relay (set `SMTP_URL`, works on the Free plan) or Cloudflare Email Sending, which needs a [Paid Worker](https://developers.cloudflare.com/workers/platform/pricing/) plan ($5/month).
 
 ## Deploy
 
