@@ -9,3 +9,10 @@ CF_TOKEN=your_api_token_with_zone_email_permissions
 # Legacy Global API Key alternative. Use this only instead of CF_TOKEN.
 # CF_EMAIL=you@example.com
 # CF_API_KEY=your_global_api_key
+
+# Outbound mail (optional). Cloudflare Email Sending is unavailable on the
+# Free plan, so mailbox creation and domain setup never require it — set
+# SMTP_URL to enable sending mail through any SMTP relay instead.
+#   smtps://user:pass@smtp.example.com:465  (implicit TLS)
+#   smtp://user:pass@smtp.example.com:587   (STARTTLS)
+# SMTP_URL=smtps://username:password@smtp.example.com:465

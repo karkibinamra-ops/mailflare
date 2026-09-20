@@ -109,16 +109,26 @@ export async function getDomainDns(
 	env: CloudflareEnv,
 	domain: typeof domains.$inferSelect,
 ): Promise<DomainDnsView> {
-	const [routingDns, routingSettings, sendingSubdomains] = await Promise.all([
+	const [routingDns, routingSettings] = await Promise.all([
 		getEmailRoutingDns(env, domain.zoneId),
 		getEmailRoutingSettings(env, domain.zoneId),
-		listSendingSubdomains(env, domain.zoneId),
 	]);
-	const sendingSubdomain = findSendingSubdomain(domain.hostname, sendingSubdomains);
+
+	// Email Sending is optional (unavailable on Cloudflare's Free plan) and must
+	// never break the DNS/status view for routing, which is required.
 	let sending: CfDnsRecord[] = [];
-	if (sendingSubdomain?.tag) {
-		sending = await getSendingSubdomainDns(env, domain.zoneId, sendingSubdomain.tag);
+	let sendingEnabled = false;
+	try {
+		const sendingSubdomains = await listSendingSubdomains(env, domain.zoneId);
+		const sendingSubdomain = findSendingSubdomain(domain.hostname, sendingSubdomains);
+		sendingEnabled = sendingSubdomain?.enabled ?? false;
+		if (sendingSubdomain?.tag) {
+			sending = await getSendingSubdomainDns(env, domain.zoneId, sendingSubdomain.tag);
+		}
+	} catch (err) {
+		console.warn("getDomainDns: Email Sending unavailable, continuing without it", err);
 	}
+
 	return {
 		routing: {
 			records: routingDns.records,
@@ -126,7 +136,7 @@ export async function getDomainDns(
 			status: routingSettings.status,
 		},
 		sending,
-		sendingEnabled: sendingSubdomain?.enabled ?? false,
+		sendingEnabled,
 	};
 }
 

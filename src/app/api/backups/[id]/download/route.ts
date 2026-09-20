@@ -5,6 +5,7 @@ import { backups } from "@/db/schema";
 import { assertAdmin } from "@/lib/auth/admin";
 import { requireUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
+import { getBlob } from "@/lib/storage/blob";
 
 export async function GET(
 	request: Request,
@@ -24,21 +25,28 @@ export async function GET(
 			.where(eq(backups.id, id))
 			.limit(1);
 
-		// Backup files are not stored in R2 in this deployment.
-		if (!backup || backup.status !== "completed") {
+		if (!backup || backup.status !== "completed" || !backup.r2Key) {
 			return NextResponse.json(
 				{ error: "Backup file not found" },
 				{ status: 404 },
 			);
 		}
 
-		return NextResponse.json(
-			{
-				error:
-					"Stored backup downloads are disabled because this deployment does not use Cloudflare R2.",
+		const blob = await getBlob(env, backup.r2Key);
+		if (!blob) {
+			return NextResponse.json(
+				{ error: "Backup file not found" },
+				{ status: 404 },
+			);
+		}
+
+		return new NextResponse(blob.data, {
+			headers: {
+				"Content-Type": blob.contentType ?? "application/json",
+				"Content-Disposition": `attachment; filename="${backup.filename ?? `${backup.id}.json`}"`,
+				"Cache-Control": "no-store",
 			},
-			{ status: 404 },
-		);
+		});
 	} catch {
 		return NextResponse.json(
 			{ error: "Forbidden" },

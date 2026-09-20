@@ -9,6 +9,11 @@ import { getAuthorizedSenderAddress } from "@/lib/email/sender";
 import { createAuditLog } from "@/lib/mailboxes/audit";
 import { storeMessageAttachments, validateAttachments } from "@/lib/email/attachments";
 import type { AttachmentContent } from "@/lib/email/attachment-types";
+import {
+	OutboundProviderNotConfiguredError,
+	OutboundProviderPermanentError,
+	sendOutboundEmail,
+} from "@/lib/email/transports";
 
 export type SendEmailInput = {
 	userId: string;
@@ -70,30 +75,25 @@ export async function sendEmail(env: CloudflareEnv, input: SendEmailInput): Prom
 	});
 
 	try {
-		const response = await env.EMAIL.send({
-			from: sender.fromAddr,
-			to: input.to,
-			subject: input.subject,
-			headers: input.headers,
-			html: input.html,
-			text: input.text,
-			attachments: attachments.map((attachment) =>
-				attachment.disposition === "inline" && attachment.contentId
-					? {
-							filename: attachment.filename,
-							type: attachment.type,
-							content: attachment.content,
-							disposition: "inline" as const,
-							contentId: attachment.contentId,
-						}
-					: {
-							filename: attachment.filename,
-							type: attachment.type,
-							content: attachment.content,
-							disposition: "attachment" as const,
-						},
-			),
-		});
+		const response = await sendOutboundEmail(
+			env,
+			{
+				from: sender.fromAddr,
+				to: input.to,
+				subject: input.subject,
+				headers: input.headers,
+				html: input.html,
+				text: input.text,
+				attachments: attachments.map((attachment) => ({
+					filename: attachment.filename,
+					type: attachment.type,
+					content: attachment.content,
+					disposition: attachment.disposition ?? "attachment",
+					contentId: attachment.contentId,
+				})),
+			},
+			messageId,
+		);
 
 		await db
 			.update(messages)
@@ -133,5 +133,19 @@ export async function processOutboundQueue(
 	env: CloudflareEnv,
 	payload: OutboundQueueMessage,
 ): Promise<void> {
-	await sendEmail(env, payload);
+	try {
+		await sendEmail(env, payload);
+	} catch (err) {
+		// sendEmail already recorded the failure on the message/job and fired the
+		// message.failed webhook. A missing provider or a permanent provider
+		// rejection will never succeed on retry, so swallow it here rather than
+		// asking the queue to redeliver it (which would otherwise retry forever
+		// within the queue's configured max_retries and then land in a dead
+		// letter state for no reason). Transient errors are rethrown so the
+		// queue's normal retry/backoff still applies.
+		if (err instanceof OutboundProviderNotConfiguredError || err instanceof OutboundProviderPermanentError) {
+			return;
+		}
+		throw err;
+	}
 }

@@ -49,6 +49,9 @@
       },
       "CF_API_KEY": {
         "description": "Legacy Global API Key auth only. Prefer `CF_TOKEN` for new deployments."
+      },
+      "SMTP_URL": {
+        "description": "Optional. Enables outbound mail via an SMTP relay instead of Cloudflare Email Sending (which requires a paid Workers plan). Format: smtps://user:pass@host:465 or smtp://user:pass@host:587."
       }
     }
   },

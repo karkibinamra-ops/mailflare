@@ -28,6 +28,12 @@ interface CloudflareEnv {
 	CF_API_KEY?: string;
 	CF_EMAIL?: string;
 
+	// Outbound mail: when set, SMTP relay is used instead of Cloudflare Email
+	// Sending (which requires a paid plan). Format:
+	//   smtps://user:pass@host:465  (implicit TLS)
+	//   smtp://user:pass@host:587   (STARTTLS)
+	SMTP_URL?: string;
+
 	TURNSTILE_SECRET_KEY?: string;
 
 	GITHUB_UPDATE_TOKEN?: string;

@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { backups, backupSettings } from "@/db/schema";
 import { newId } from "@/lib/ids";
+import { deleteBlob } from "@/lib/storage/blob";
 import type { BackupScheduleType } from "./types";
 import { BACKUP_SETTINGS_ID, getUtcDayBounds, isBackupDue } from "./utils";
 
@@ -120,7 +121,9 @@ export async function deleteBackup(
 		throw new Error("A backup in progress cannot be deleted");
 	}
 
-	// R2 storage is disabled, so there is no external backup object to delete.
+	if (backup.r2Key) {
+		await deleteBlob(env, backup.r2Key);
+	}
 	await db.delete(backups).where(eq(backups.id, id));
 
 	return true;

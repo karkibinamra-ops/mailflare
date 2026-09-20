@@ -57,13 +57,15 @@ export default function DomainDnsDetails({ domain, dns }: DomainDnsDetailsProps)
 							</li>
 						))}
 						{dns.sending.length === 0 && (
-							<li className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${domain.sendingEnabled ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
+							<li className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${domain.sendingEnabled ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
 								{domain.sendingEnabled ? (
 									<Check className="h-4 w-4 shrink-0 text-green-600" />
 								) : (
-									<AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
+									<AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
 								)}
-								{domain.sendingEnabled ? "Email sending is configured" : "No sending DNS records found"}
+								{domain.sendingEnabled
+									? "Email sending is configured"
+									: "Cloudflare Email Sending isn't set up for this domain (unavailable on the Free plan). Outbound email requires SMTP configuration — set SMTP_URL in your Worker to send mail."}
 							</li>
 						)}
 					</ul>
