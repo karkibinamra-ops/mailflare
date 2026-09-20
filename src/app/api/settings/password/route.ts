@@ -10,32 +10,28 @@ import type { ChangePasswordInput } from "./types";
 import { parseChangePasswordRequest } from "./utils";
 
 export async function PATCH(request: Request) {
-	const env = getEnv();
-	const user = await requireUser(env, request);
-	let parsed: ChangePasswordInput;
+  const env = getEnv();
+  const user = await requireUser(env, request);
+  let parsed: ChangePasswordInput;
 
-	try {
-		parsed = await parseChangePasswordRequest(request);
-	} catch (err) {
-		if (err instanceof ZodError) {
-			return NextResponse.json({ error: err.flatten() }, { status: 400 });
-		}
-		return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-	}
+  try {
+    parsed = await parseChangePasswordRequest(request);
+  } catch (err) {
+    if (err instanceof ZodError) return NextResponse.json({ error: err.flatten() }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
-	if (!verifyPassword(parsed.currentPassword, user.passwordHash)) {
-		return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
-	}
+  if (!(await verifyPassword(parsed.currentPassword, user.passwordHash))) {
+    return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
+  }
 
-	if (verifyPassword(parsed.newPassword, user.passwordHash)) {
-		return NextResponse.json({ error: "New password must be different from the current password" }, { status: 400 });
-	}
+  if (await verifyPassword(parsed.newPassword, user.passwordHash)) {
+    return NextResponse.json({ error: "New password must be different from the current password" }, { status: 400 });
+  }
 
-	const db = getDb(env);
-	await db
-		.update(users)
-		.set({ passwordHash: hashPassword(parsed.newPassword) })
-		.where(eq(users.id, user.id));
+  const passwordHash = await hashPassword(parsed.newPassword);
+  const db = getDb(env);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, user.id));
 
-	return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true });
 }
