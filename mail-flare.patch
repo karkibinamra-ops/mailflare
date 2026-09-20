@@ -1,0 +1,2060 @@
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.dev.vars.example work/mailflare-main/.dev.vars.example
+--- orig_extract/mailflare-main/.dev.vars.example	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/.dev.vars.example	2026-09-20 10:04:50.478349310 +0000
+@@ -9,3 +9,10 @@
+ # Legacy Global API Key alternative. Use this only instead of CF_TOKEN.
+ # CF_EMAIL=you@example.com
+ # CF_API_KEY=your_global_api_key
++
++# Outbound mail (optional). Cloudflare Email Sending is unavailable on the
++# Free plan, so mailbox creation and domain setup never require it — set
++# SMTP_URL to enable sending mail through any SMTP relay instead.
++#   smtps://user:pass@smtp.example.com:465  (implicit TLS)
++#   smtp://user:pass@smtp.example.com:587   (STARTTLS)
++# SMTP_URL=smtps://username:password@smtp.example.com:465
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/HEAD work/mailflare-main/.git/HEAD
+--- orig_extract/mailflare-main/.git/HEAD	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/HEAD	2026-09-20 10:04:13.042026342 +0000
+@@ -0,0 +1 @@
++ref: refs/heads/master
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/config work/mailflare-main/.git/config
+--- orig_extract/mailflare-main/.git/config	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/config	2026-09-20 10:04:13.042163296 +0000
+@@ -0,0 +1,5 @@
++[core]
++	repositoryformatversion = 0
++	filemode = true
++	bare = false
++	logallrefupdates = true
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/description work/mailflare-main/.git/description
+--- orig_extract/mailflare-main/.git/description	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/description	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1 @@
++Unnamed repository; edit this file 'description' to name the repository.
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/applypatch-msg.sample work/mailflare-main/.git/hooks/applypatch-msg.sample
+--- orig_extract/mailflare-main/.git/hooks/applypatch-msg.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/applypatch-msg.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,15 @@
++#!/bin/sh
++#
++# An example hook script to check the commit log message taken by
++# applypatch from an e-mail message.
++#
++# The hook should exit with non-zero status after issuing an
++# appropriate message if it wants to stop the commit.  The hook is
++# allowed to edit the commit message file.
++#
++# To enable this hook, rename this file to "applypatch-msg".
++
++. git-sh-setup
++commitmsg="$(git rev-parse --git-path hooks/commit-msg)"
++test -x "$commitmsg" && exec "$commitmsg" ${1+"$@"}
++:
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/commit-msg.sample work/mailflare-main/.git/hooks/commit-msg.sample
+--- orig_extract/mailflare-main/.git/hooks/commit-msg.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/commit-msg.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,24 @@
++#!/bin/sh
++#
++# An example hook script to check the commit log message.
++# Called by "git commit" with one argument, the name of the file
++# that has the commit message.  The hook should exit with non-zero
++# status after issuing an appropriate message if it wants to stop the
++# commit.  The hook is allowed to edit the commit message file.
++#
++# To enable this hook, rename this file to "commit-msg".
++
++# Uncomment the below to add a Signed-off-by line to the message.
++# Doing this in a hook is a bad idea in general, but the prepare-commit-msg
++# hook is more suited to it.
++#
++# SOB=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
++# grep -qs "^$SOB" "$1" || echo "$SOB" >> "$1"
++
++# This example catches duplicate Signed-off-by lines.
++
++test "" = "$(grep '^Signed-off-by: ' "$1" |
++	 sort | uniq -c | sed -e '/^[ 	]*1[ 	]/d')" || {
++	echo >&2 Duplicate Signed-off-by lines.
++	exit 1
++}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/fsmonitor-watchman.sample work/mailflare-main/.git/hooks/fsmonitor-watchman.sample
+--- orig_extract/mailflare-main/.git/hooks/fsmonitor-watchman.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/fsmonitor-watchman.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,174 @@
++#!/usr/bin/perl
++
++use strict;
++use warnings;
++use IPC::Open2;
++
++# An example hook script to integrate Watchman
++# (https://facebook.github.io/watchman/) with git to speed up detecting
++# new and modified files.
++#
++# The hook is passed a version (currently 2) and last update token
++# formatted as a string and outputs to stdout a new update token and
++# all files that have been modified since the update token. Paths must
++# be relative to the root of the working tree and separated by a single NUL.
++#
++# To enable this hook, rename this file to "query-watchman" and set
++# 'git config core.fsmonitor .git/hooks/query-watchman'
++#
++my ($version, $last_update_token) = @ARGV;
++
++# Uncomment for debugging
++# print STDERR "$0 $version $last_update_token\n";
++
++# Check the hook interface version
++if ($version ne 2) {
++	die "Unsupported query-fsmonitor hook version '$version'.\n" .
++	    "Falling back to scanning...\n";
++}
++
++my $git_work_tree = get_working_dir();
++
++my $retry = 1;
++
++my $json_pkg;
++eval {
++	require JSON::XS;
++	$json_pkg = "JSON::XS";
++	1;
++} or do {
++	require JSON::PP;
++	$json_pkg = "JSON::PP";
++};
++
++launch_watchman();
++
++sub launch_watchman {
++	my $o = watchman_query();
++	if (is_work_tree_watched($o)) {
++		output_result($o->{clock}, @{$o->{files}});
++	}
++}
++
++sub output_result {
++	my ($clockid, @files) = @_;
++
++	# Uncomment for debugging watchman output
++	# open (my $fh, ">", ".git/watchman-output.out");
++	# binmode $fh, ":utf8";
++	# print $fh "$clockid\n@files\n";
++	# close $fh;
++
++	binmode STDOUT, ":utf8";
++	print $clockid;
++	print "\0";
++	local $, = "\0";
++	print @files;
++}
++
++sub watchman_clock {
++	my $response = qx/watchman clock "$git_work_tree"/;
++	die "Failed to get clock id on '$git_work_tree'.\n" .
++		"Falling back to scanning...\n" if $? != 0;
++
++	return $json_pkg->new->utf8->decode($response);
++}
++
++sub watchman_query {
++	my $pid = open2(\*CHLD_OUT, \*CHLD_IN, 'watchman -j --no-pretty')
++	or die "open2() failed: $!\n" .
++	"Falling back to scanning...\n";
++
++	# In the query expression below we're asking for names of files that
++	# changed since $last_update_token but not from the .git folder.
++	#
++	# To accomplish this, we're using the "since" generator to use the
++	# recency index to select candidate nodes and "fields" to limit the
++	# output to file names only. Then we're using the "expression" term to
++	# further constrain the results.
++	my $last_update_line = "";
++	if (substr($last_update_token, 0, 1) eq "c") {
++		$last_update_token = "\"$last_update_token\"";
++		$last_update_line = qq[\n"since": $last_update_token,];
++	}
++	my $query = <<"	END";
++		["query", "$git_work_tree", {$last_update_line
++			"fields": ["name"],
++			"expression": ["not", ["dirname", ".git"]]
++		}]
++	END
++
++	# Uncomment for debugging the watchman query
++	# open (my $fh, ">", ".git/watchman-query.json");
++	# print $fh $query;
++	# close $fh;
++
++	print CHLD_IN $query;
++	close CHLD_IN;
++	my $response = do {local $/; <CHLD_OUT>};
++
++	# Uncomment for debugging the watch response
++	# open ($fh, ">", ".git/watchman-response.json");
++	# print $fh $response;
++	# close $fh;
++
++	die "Watchman: command returned no output.\n" .
++	"Falling back to scanning...\n" if $response eq "";
++	die "Watchman: command returned invalid output: $response\n" .
++	"Falling back to scanning...\n" unless $response =~ /^\{/;
++
++	return $json_pkg->new->utf8->decode($response);
++}
++
++sub is_work_tree_watched {
++	my ($output) = @_;
++	my $error = $output->{error};
++	if ($retry > 0 and $error and $error =~ m/unable to resolve root .* directory (.*) is not watched/) {
++		$retry--;
++		my $response = qx/watchman watch "$git_work_tree"/;
++		die "Failed to make watchman watch '$git_work_tree'.\n" .
++		    "Falling back to scanning...\n" if $? != 0;
++		$output = $json_pkg->new->utf8->decode($response);
++		$error = $output->{error};
++		die "Watchman: $error.\n" .
++		"Falling back to scanning...\n" if $error;
++
++		# Uncomment for debugging watchman output
++		# open (my $fh, ">", ".git/watchman-output.out");
++		# close $fh;
++
++		# Watchman will always return all files on the first query so
++		# return the fast "everything is dirty" flag to git and do the
++		# Watchman query just to get it over with now so we won't pay
++		# the cost in git to look up each individual file.
++		my $o = watchman_clock();
++		$error = $output->{error};
++
++		die "Watchman: $error.\n" .
++		"Falling back to scanning...\n" if $error;
++
++		output_result($o->{clock}, ("/"));
++		$last_update_token = $o->{clock};
++
++		eval { launch_watchman() };
++		return 0;
++	}
++
++	die "Watchman: $error.\n" .
++	"Falling back to scanning...\n" if $error;
++
++	return 1;
++}
++
++sub get_working_dir {
++	my $working_dir;
++	if ($^O =~ 'msys' || $^O =~ 'cygwin') {
++		$working_dir = Win32::GetCwd();
++		$working_dir =~ tr/\\/\//;
++	} else {
++		require Cwd;
++		$working_dir = Cwd::cwd();
++	}
++
++	return $working_dir;
++}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/post-update.sample work/mailflare-main/.git/hooks/post-update.sample
+--- orig_extract/mailflare-main/.git/hooks/post-update.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/post-update.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,8 @@
++#!/bin/sh
++#
++# An example hook script to prepare a packed repository for use over
++# dumb transports.
++#
++# To enable this hook, rename this file to "post-update".
++
++exec git update-server-info
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/pre-applypatch.sample work/mailflare-main/.git/hooks/pre-applypatch.sample
+--- orig_extract/mailflare-main/.git/hooks/pre-applypatch.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/pre-applypatch.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,14 @@
++#!/bin/sh
++#
++# An example hook script to verify what is about to be committed
++# by applypatch from an e-mail message.
++#
++# The hook should exit with non-zero status after issuing an
++# appropriate message if it wants to stop the commit.
++#
++# To enable this hook, rename this file to "pre-applypatch".
++
++. git-sh-setup
++precommit="$(git rev-parse --git-path hooks/pre-commit)"
++test -x "$precommit" && exec "$precommit" ${1+"$@"}
++:
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/pre-commit.sample work/mailflare-main/.git/hooks/pre-commit.sample
+--- orig_extract/mailflare-main/.git/hooks/pre-commit.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/pre-commit.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,49 @@
++#!/bin/sh
++#
++# An example hook script to verify what is about to be committed.
++# Called by "git commit" with no arguments.  The hook should
++# exit with non-zero status after issuing an appropriate message if
++# it wants to stop the commit.
++#
++# To enable this hook, rename this file to "pre-commit".
++
++if git rev-parse --verify HEAD >/dev/null 2>&1
++then
++	against=HEAD
++else
++	# Initial commit: diff against an empty tree object
++	against=$(git hash-object -t tree /dev/null)
++fi
++
++# If you want to allow non-ASCII filenames set this variable to true.
++allownonascii=$(git config --type=bool hooks.allownonascii)
++
++# Redirect output to stderr.
++exec 1>&2
++
++# Cross platform projects tend to avoid non-ASCII filenames; prevent
++# them from being added to the repository. We exploit the fact that the
++# printable range starts at the space character and ends with tilde.
++if [ "$allownonascii" != "true" ] &&
++	# Note that the use of brackets around a tr range is ok here, (it's
++	# even required, for portability to Solaris 10's /usr/bin/tr), since
++	# the square bracket bytes happen to fall in the designated range.
++	test $(git diff --cached --name-only --diff-filter=A -z $against |
++	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
++then
++	cat <<\EOF
++Error: Attempt to add a non-ASCII file name.
++
++This can cause problems if you want to work with people on other platforms.
++
++To be portable it is advisable to rename the file.
++
++If you know what you are doing you can disable this check using:
++
++  git config hooks.allownonascii true
++EOF
++	exit 1
++fi
++
++# If there are whitespace errors, print the offending file names and fail.
++exec git diff-index --check --cached $against --
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/pre-merge-commit.sample work/mailflare-main/.git/hooks/pre-merge-commit.sample
+--- orig_extract/mailflare-main/.git/hooks/pre-merge-commit.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/pre-merge-commit.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,13 @@
++#!/bin/sh
++#
++# An example hook script to verify what is about to be committed.
++# Called by "git merge" with no arguments.  The hook should
++# exit with non-zero status after issuing an appropriate message to
++# stderr if it wants to stop the merge commit.
++#
++# To enable this hook, rename this file to "pre-merge-commit".
++
++. git-sh-setup
++test -x "$GIT_DIR/hooks/pre-commit" &&
++        exec "$GIT_DIR/hooks/pre-commit"
++:
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/pre-push.sample work/mailflare-main/.git/hooks/pre-push.sample
+--- orig_extract/mailflare-main/.git/hooks/pre-push.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/pre-push.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,53 @@
++#!/bin/sh
++
++# An example hook script to verify what is about to be pushed.  Called by "git
++# push" after it has checked the remote status, but before anything has been
++# pushed.  If this script exits with a non-zero status nothing will be pushed.
++#
++# This hook is called with the following parameters:
++#
++# $1 -- Name of the remote to which the push is being done
++# $2 -- URL to which the push is being done
++#
++# If pushing without using a named remote those arguments will be equal.
++#
++# Information about the commits which are being pushed is supplied as lines to
++# the standard input in the form:
++#
++#   <local ref> <local oid> <remote ref> <remote oid>
++#
++# This sample shows how to prevent push of commits where the log message starts
++# with "WIP" (work in progress).
++
++remote="$1"
++url="$2"
++
++zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
++
++while read local_ref local_oid remote_ref remote_oid
++do
++	if test "$local_oid" = "$zero"
++	then
++		# Handle delete
++		:
++	else
++		if test "$remote_oid" = "$zero"
++		then
++			# New branch, examine all commits
++			range="$local_oid"
++		else
++			# Update to existing branch, examine new commits
++			range="$remote_oid..$local_oid"
++		fi
++
++		# Check for WIP commit
++		commit=$(git rev-list -n 1 --grep '^WIP' "$range")
++		if test -n "$commit"
++		then
++			echo >&2 "Found WIP commit in $local_ref, not pushing"
++			exit 1
++		fi
++	fi
++done
++
++exit 0
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/pre-rebase.sample work/mailflare-main/.git/hooks/pre-rebase.sample
+--- orig_extract/mailflare-main/.git/hooks/pre-rebase.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/pre-rebase.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,169 @@
++#!/bin/sh
++#
++# Copyright (c) 2006, 2008 Junio C Hamano
++#
++# The "pre-rebase" hook is run just before "git rebase" starts doing
++# its job, and can prevent the command from running by exiting with
++# non-zero status.
++#
++# The hook is called with the following parameters:
++#
++# $1 -- the upstream the series was forked from.
++# $2 -- the branch being rebased (or empty when rebasing the current branch).
++#
++# This sample shows how to prevent topic branches that are already
++# merged to 'next' branch from getting rebased, because allowing it
++# would result in rebasing already published history.
++
++publish=next
++basebranch="$1"
++if test "$#" = 2
++then
++	topic="refs/heads/$2"
++else
++	topic=`git symbolic-ref HEAD` ||
++	exit 0 ;# we do not interrupt rebasing detached HEAD
++fi
++
++case "$topic" in
++refs/heads/??/*)
++	;;
++*)
++	exit 0 ;# we do not interrupt others.
++	;;
++esac
++
++# Now we are dealing with a topic branch being rebased
++# on top of master.  Is it OK to rebase it?
++
++# Does the topic really exist?
++git show-ref -q "$topic" || {
++	echo >&2 "No such branch $topic"
++	exit 1
++}
++
++# Is topic fully merged to master?
++not_in_master=`git rev-list --pretty=oneline ^master "$topic"`
++if test -z "$not_in_master"
++then
++	echo >&2 "$topic is fully merged to master; better remove it."
++	exit 1 ;# we could allow it, but there is no point.
++fi
++
++# Is topic ever merged to next?  If so you should not be rebasing it.
++only_next_1=`git rev-list ^master "^$topic" ${publish} | sort`
++only_next_2=`git rev-list ^master           ${publish} | sort`
++if test "$only_next_1" = "$only_next_2"
++then
++	not_in_topic=`git rev-list "^$topic" master`
++	if test -z "$not_in_topic"
++	then
++		echo >&2 "$topic is already up to date with master"
++		exit 1 ;# we could allow it, but there is no point.
++	else
++		exit 0
++	fi
++else
++	not_in_next=`git rev-list --pretty=oneline ^${publish} "$topic"`
++	/usr/bin/perl -e '
++		my $topic = $ARGV[0];
++		my $msg = "* $topic has commits already merged to public branch:\n";
++		my (%not_in_next) = map {
++			/^([0-9a-f]+) /;
++			($1 => 1);
++		} split(/\n/, $ARGV[1]);
++		for my $elem (map {
++				/^([0-9a-f]+) (.*)$/;
++				[$1 => $2];
++			} split(/\n/, $ARGV[2])) {
++			if (!exists $not_in_next{$elem->[0]}) {
++				if ($msg) {
++					print STDERR $msg;
++					undef $msg;
++				}
++				print STDERR " $elem->[1]\n";
++			}
++		}
++	' "$topic" "$not_in_next" "$not_in_master"
++	exit 1
++fi
++
++<<\DOC_END
++
++This sample hook safeguards topic branches that have been
++published from being rewound.
++
++The workflow assumed here is:
++
++ * Once a topic branch forks from "master", "master" is never
++   merged into it again (either directly or indirectly).
++
++ * Once a topic branch is fully cooked and merged into "master",
++   it is deleted.  If you need to build on top of it to correct
++   earlier mistakes, a new topic branch is created by forking at
++   the tip of the "master".  This is not strictly necessary, but
++   it makes it easier to keep your history simple.
++
++ * Whenever you need to test or publish your changes to topic
++   branches, merge them into "next" branch.
++
++The script, being an example, hardcodes the publish branch name
++to be "next", but it is trivial to make it configurable via
++$GIT_DIR/config mechanism.
++
++With this workflow, you would want to know:
++
++(1) ... if a topic branch has ever been merged to "next".  Young
++    topic branches can have stupid mistakes you would rather
++    clean up before publishing, and things that have not been
++    merged into other branches can be easily rebased without
++    affecting other people.  But once it is published, you would
++    not want to rewind it.
++
++(2) ... if a topic branch has been fully merged to "master".
++    Then you can delete it.  More importantly, you should not
++    build on top of it -- other people may already want to
++    change things related to the topic as patches against your
++    "master", so if you need further changes, it is better to
++    fork the topic (perhaps with the same name) afresh from the
++    tip of "master".
++
++Let's look at this example:
++
++		   o---o---o---o---o---o---o---o---o---o "next"
++		  /       /           /           /
++		 /   a---a---b A     /           /
++		/   /               /           /
++	       /   /   c---c---c---c B         /
++	      /   /   /             \         /
++	     /   /   /   b---b C     \       /
++	    /   /   /   /             \     /
++    ---o---o---o---o---o---o---o---o---o---o---o "master"
++
++
++A, B and C are topic branches.
++
++ * A has one fix since it was merged up to "next".
++
++ * B has finished.  It has been fully merged up to "master" and "next",
++   and is ready to be deleted.
++
++ * C has not merged to "next" at all.
++
++We would want to allow C to be rebased, refuse A, and encourage
++B to be deleted.
++
++To compute (1):
++
++	git rev-list ^master ^topic next
++	git rev-list ^master        next
++
++	if these match, topic has not merged in next at all.
++
++To compute (2):
++
++	git rev-list master..topic
++
++	if this is empty, it is fully merged to "master".
++
++DOC_END
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/pre-receive.sample work/mailflare-main/.git/hooks/pre-receive.sample
+--- orig_extract/mailflare-main/.git/hooks/pre-receive.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/pre-receive.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,24 @@
++#!/bin/sh
++#
++# An example hook script to make use of push options.
++# The example simply echoes all push options that start with 'echoback='
++# and rejects all pushes when the "reject" push option is used.
++#
++# To enable this hook, rename this file to "pre-receive".
++
++if test -n "$GIT_PUSH_OPTION_COUNT"
++then
++	i=0
++	while test "$i" -lt "$GIT_PUSH_OPTION_COUNT"
++	do
++		eval "value=\$GIT_PUSH_OPTION_$i"
++		case "$value" in
++		echoback=*)
++			echo "echo from the pre-receive-hook: ${value#*=}" >&2
++			;;
++		reject)
++			exit 1
++		esac
++		i=$((i + 1))
++	done
++fi
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/prepare-commit-msg.sample work/mailflare-main/.git/hooks/prepare-commit-msg.sample
+--- orig_extract/mailflare-main/.git/hooks/prepare-commit-msg.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/prepare-commit-msg.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,42 @@
++#!/bin/sh
++#
++# An example hook script to prepare the commit log message.
++# Called by "git commit" with the name of the file that has the
++# commit message, followed by the description of the commit
++# message's source.  The hook's purpose is to edit the commit
++# message file.  If the hook fails with a non-zero status,
++# the commit is aborted.
++#
++# To enable this hook, rename this file to "prepare-commit-msg".
++
++# This hook includes three examples. The first one removes the
++# "# Please enter the commit message..." help message.
++#
++# The second includes the output of "git diff --name-status -r"
++# into the message, just before the "git status" output.  It is
++# commented because it doesn't cope with --amend or with squashed
++# commits.
++#
++# The third example adds a Signed-off-by line to the message, that can
++# still be edited.  This is rarely a good idea.
++
++COMMIT_MSG_FILE=$1
++COMMIT_SOURCE=$2
++SHA1=$3
++
++/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
++
++# case "$COMMIT_SOURCE,$SHA1" in
++#  ,|template,)
++#    /usr/bin/perl -i.bak -pe '
++#       print "\n" . `git diff --cached --name-status -r`
++# 	 if /^#/ && $first++ == 0' "$COMMIT_MSG_FILE" ;;
++#  *) ;;
++# esac
++
++# SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
++# git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
++# if test -z "$COMMIT_SOURCE"
++# then
++#   /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
++# fi
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/push-to-checkout.sample work/mailflare-main/.git/hooks/push-to-checkout.sample
+--- orig_extract/mailflare-main/.git/hooks/push-to-checkout.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/push-to-checkout.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,78 @@
++#!/bin/sh
++
++# An example hook script to update a checked-out tree on a git push.
++#
++# This hook is invoked by git-receive-pack(1) when it reacts to git
++# push and updates reference(s) in its repository, and when the push
++# tries to update the branch that is currently checked out and the
++# receive.denyCurrentBranch configuration variable is set to
++# updateInstead.
++#
++# By default, such a push is refused if the working tree and the index
++# of the remote repository has any difference from the currently
++# checked out commit; when both the working tree and the index match
++# the current commit, they are updated to match the newly pushed tip
++# of the branch. This hook is to be used to override the default
++# behaviour; however the code below reimplements the default behaviour
++# as a starting point for convenient modification.
++#
++# The hook receives the commit with which the tip of the current
++# branch is going to be updated:
++commit=$1
++
++# It can exit with a non-zero status to refuse the push (when it does
++# so, it must not modify the index or the working tree).
++die () {
++	echo >&2 "$*"
++	exit 1
++}
++
++# Or it can make any necessary changes to the working tree and to the
++# index to bring them to the desired state when the tip of the current
++# branch is updated to the new commit, and exit with a zero status.
++#
++# For example, the hook can simply run git read-tree -u -m HEAD "$1"
++# in order to emulate git fetch that is run in the reverse direction
++# with git push, as the two-tree form of git read-tree -u -m is
++# essentially the same as git switch or git checkout that switches
++# branches while keeping the local changes in the working tree that do
++# not interfere with the difference between the branches.
++
++# The below is a more-or-less exact translation to shell of the C code
++# for the default behaviour for git's push-to-checkout hook defined in
++# the push_to_deploy() function in builtin/receive-pack.c.
++#
++# Note that the hook will be executed from the repository directory,
++# not from the working tree, so if you want to perform operations on
++# the working tree, you will have to adapt your code accordingly, e.g.
++# by adding "cd .." or using relative paths.
++
++if ! git update-index -q --ignore-submodules --refresh
++then
++	die "Up-to-date check failed"
++fi
++
++if ! git diff-files --quiet --ignore-submodules --
++then
++	die "Working directory has unstaged changes"
++fi
++
++# This is a rough translation of:
++#
++#   head_has_history() ? "HEAD" : EMPTY_TREE_SHA1_HEX
++if git cat-file -e HEAD 2>/dev/null
++then
++	head=HEAD
++else
++	head=$(git hash-object -t tree --stdin </dev/null)
++fi
++
++if ! git diff-index --quiet --cached --ignore-submodules $head --
++then
++	die "Working directory has staged changes"
++fi
++
++if ! git read-tree -u -m "$commit"
++then
++	die "Could not update working tree to new HEAD"
++fi
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/sendemail-validate.sample work/mailflare-main/.git/hooks/sendemail-validate.sample
+--- orig_extract/mailflare-main/.git/hooks/sendemail-validate.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/sendemail-validate.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,77 @@
++#!/bin/sh
++
++# An example hook script to validate a patch (and/or patch series) before
++# sending it via email.
++#
++# The hook should exit with non-zero status after issuing an appropriate
++# message if it wants to prevent the email(s) from being sent.
++#
++# To enable this hook, rename this file to "sendemail-validate".
++#
++# By default, it will only check that the patch(es) can be applied on top of
++# the default upstream branch without conflicts in a secondary worktree. After
++# validation (successful or not) of the last patch of a series, the worktree
++# will be deleted.
++#
++# The following config variables can be set to change the default remote and
++# remote ref that are used to apply the patches against:
++#
++#   sendemail.validateRemote (default: origin)
++#   sendemail.validateRemoteRef (default: HEAD)
++#
++# Replace the TODO placeholders with appropriate checks according to your
++# needs.
++
++validate_cover_letter () {
++	file="$1"
++	# TODO: Replace with appropriate checks (e.g. spell checking).
++	true
++}
++
++validate_patch () {
++	file="$1"
++	# Ensure that the patch applies without conflicts.
++	git am -3 "$file" || return
++	# TODO: Replace with appropriate checks for this patch
++	# (e.g. checkpatch.pl).
++	true
++}
++
++validate_series () {
++	# TODO: Replace with appropriate checks for the whole series
++	# (e.g. quick build, coding style checks, etc.).
++	true
++}
++
++# main -------------------------------------------------------------------------
++
++if test "$GIT_SENDEMAIL_FILE_COUNTER" = 1
++then
++	remote=$(git config --default origin --get sendemail.validateRemote) &&
++	ref=$(git config --default HEAD --get sendemail.validateRemoteRef) &&
++	worktree=$(mktemp --tmpdir -d sendemail-validate.XXXXXXX) &&
++	git worktree add -fd --checkout "$worktree" "refs/remotes/$remote/$ref" &&
++	git config --replace-all sendemail.validateWorktree "$worktree"
++else
++	worktree=$(git config --get sendemail.validateWorktree)
++fi || {
++	echo "sendemail-validate: error: failed to prepare worktree" >&2
++	exit 1
++}
++
++unset GIT_DIR GIT_WORK_TREE
++cd "$worktree" &&
++
++if grep -q "^diff --git " "$1"
++then
++	validate_patch "$1"
++else
++	validate_cover_letter "$1"
++fi &&
++
++if test "$GIT_SENDEMAIL_FILE_COUNTER" = "$GIT_SENDEMAIL_FILE_TOTAL"
++then
++	git config --unset-all sendemail.validateWorktree &&
++	trap 'git worktree remove -ff "$worktree"' EXIT &&
++	validate_series
++fi
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/hooks/update.sample work/mailflare-main/.git/hooks/update.sample
+--- orig_extract/mailflare-main/.git/hooks/update.sample	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/hooks/update.sample	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,128 @@
++#!/bin/sh
++#
++# An example hook script to block unannotated tags from entering.
++# Called by "git receive-pack" with arguments: refname sha1-old sha1-new
++#
++# To enable this hook, rename this file to "update".
++#
++# Config
++# ------
++# hooks.allowunannotated
++#   This boolean sets whether unannotated tags will be allowed into the
++#   repository.  By default they won't be.
++# hooks.allowdeletetag
++#   This boolean sets whether deleting tags will be allowed in the
++#   repository.  By default they won't be.
++# hooks.allowmodifytag
++#   This boolean sets whether a tag may be modified after creation. By default
++#   it won't be.
++# hooks.allowdeletebranch
++#   This boolean sets whether deleting branches will be allowed in the
++#   repository.  By default they won't be.
++# hooks.denycreatebranch
++#   This boolean sets whether remotely creating branches will be denied
++#   in the repository.  By default this is allowed.
++#
++
++# --- Command line
++refname="$1"
++oldrev="$2"
++newrev="$3"
++
++# --- Safety check
++if [ -z "$GIT_DIR" ]; then
++	echo "Don't run this script from the command line." >&2
++	echo " (if you want, you could supply GIT_DIR then run" >&2
++	echo "  $0 <ref> <oldrev> <newrev>)" >&2
++	exit 1
++fi
++
++if [ -z "$refname" -o -z "$oldrev" -o -z "$newrev" ]; then
++	echo "usage: $0 <ref> <oldrev> <newrev>" >&2
++	exit 1
++fi
++
++# --- Config
++allowunannotated=$(git config --type=bool hooks.allowunannotated)
++allowdeletebranch=$(git config --type=bool hooks.allowdeletebranch)
++denycreatebranch=$(git config --type=bool hooks.denycreatebranch)
++allowdeletetag=$(git config --type=bool hooks.allowdeletetag)
++allowmodifytag=$(git config --type=bool hooks.allowmodifytag)
++
++# check for no description
++projectdesc=$(sed -e '1q' "$GIT_DIR/description")
++case "$projectdesc" in
++"Unnamed repository"* | "")
++	echo "*** Project description file hasn't been set" >&2
++	exit 1
++	;;
++esac
++
++# --- Check types
++# if $newrev is 0000...0000, it's a commit to delete a ref.
++zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
++if [ "$newrev" = "$zero" ]; then
++	newrev_type=delete
++else
++	newrev_type=$(git cat-file -t $newrev)
++fi
++
++case "$refname","$newrev_type" in
++	refs/tags/*,commit)
++		# un-annotated tag
++		short_refname=${refname##refs/tags/}
++		if [ "$allowunannotated" != "true" ]; then
++			echo "*** The un-annotated tag, $short_refname, is not allowed in this repository" >&2
++			echo "*** Use 'git tag [ -a | -s ]' for tags you want to propagate." >&2
++			exit 1
++		fi
++		;;
++	refs/tags/*,delete)
++		# delete tag
++		if [ "$allowdeletetag" != "true" ]; then
++			echo "*** Deleting a tag is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	refs/tags/*,tag)
++		# annotated tag
++		if [ "$allowmodifytag" != "true" ] && git rev-parse $refname > /dev/null 2>&1
++		then
++			echo "*** Tag '$refname' already exists." >&2
++			echo "*** Modifying a tag is not allowed in this repository." >&2
++			exit 1
++		fi
++		;;
++	refs/heads/*,commit)
++		# branch
++		if [ "$oldrev" = "$zero" -a "$denycreatebranch" = "true" ]; then
++			echo "*** Creating a branch is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	refs/heads/*,delete)
++		# delete branch
++		if [ "$allowdeletebranch" != "true" ]; then
++			echo "*** Deleting a branch is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	refs/remotes/*,commit)
++		# tracking branch
++		;;
++	refs/remotes/*,delete)
++		# delete tracking branch
++		if [ "$allowdeletebranch" != "true" ]; then
++			echo "*** Deleting a tracking branch is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	*)
++		# Anything else (is there anything else?)
++		echo "*** Update hook: unknown type of update to ref $refname of type $newrev_type" >&2
++		exit 1
++		;;
++esac
++
++# --- Finished
++exit 0
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/.git/info/exclude work/mailflare-main/.git/info/exclude
+--- orig_extract/mailflare-main/.git/info/exclude	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/.git/info/exclude	2026-09-20 10:04:13.038355856 +0000
+@@ -0,0 +1,6 @@
++# git ls-files --others --exclude-from=.git/info/exclude
++# Lines that start with '#' are comments.
++# For a project mostly in C, the following would be a good set of
++# exclude patterns (uncomment them if you want to use them):
++# *.[oa]
++# *~
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/CLAUDE.md work/mailflare-main/CLAUDE.md
+--- orig_extract/mailflare-main/CLAUDE.md	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/CLAUDE.md	2026-09-20 10:07:08.530721291 +0000
+@@ -28,23 +28,23 @@
+ 
+ ## Architecture
+ 
+-Next.js 16 App Router running on Cloudflare Workers via OpenNext. Drizzle ORM over D1, R2 for raw MIME, attachments, and record backups, Queues for async mail processing, a Durable Object for realtime, and a cron trigger for scheduled backups.
++Next.js 16 App Router running on Cloudflare Workers via OpenNext. Drizzle ORM over D1, with D1-backed chunked blob storage (`src/lib/storage/blob.ts`, `blob_chunks` table) for raw MIME, attachments, and record backups — no R2 dependency. Queues for async mail processing, a Durable Object for realtime, and a cron trigger for scheduled backups.
+ 
+ ### worker.ts is the entrypoint
+ 
+ `worker.ts` wraps the generated `.open-next/worker.js` and adds handlers Next.js cannot express:
+ 
+ - **`fetch`** — intercepts `/api/realtime` for the WebSocket upgrade (authenticates the session cookie, then routes to `env.REALTIME.getByName(user.id)`), delegating everything else to Next.
+-- **`email`** — the Cloudflare Email Routing handler. Resolves domain routing rules first (`resolveIncomingMail` in `src/lib/email/incoming.ts`) because `message.setReject()` and `message.forward()` only exist here, then applies optional account-level forwarding (loop-guarded by the `MAILFLARE_FORWARDED_HEADER`), writes raw MIME to R2, and enqueues to `INBOUND_QUEUE`. It never parses mail inline.
++- **`email`** — the Cloudflare Email Routing handler. Resolves domain routing rules first (`resolveIncomingMail` in `src/lib/email/incoming.ts`) because `message.setReject()` and `message.forward()` only exist here, then applies optional account-level forwarding (loop-guarded by the `MAILFLARE_FORWARDED_HEADER`), writes raw MIME to D1 blob storage, and enqueues to `INBOUND_QUEUE`. It never parses mail inline.
+ - **`queue`** — a single consumer for both queues; `isInboundQueueMessage` and `isWebhookRetryMessage` in `worker-utils.ts` discriminate inbound mail, webhook retries, and outbound payloads. Failures `retry({ delaySeconds: 10 })`.
+ 
+ It also re-exports `RealtimeHub`, which is why that class must live outside the Next build.
+ 
+ ### Mail pipeline
+ 
+-Inbound: `email` handler → R2 → queue → `processInboundMessage` (`src/lib/email/inbound.ts`) → `resolveInboundAddress` routing decision (deliver / reject / forward) → `parseRawMime` (postal-mime) → insert message + attachments → upsert contacts → `dispatchWebhooks` → `notifyUsersOfNewMessage` over the Durable Object.
++Inbound: `email` handler → D1 blob storage → queue → `processInboundMessage` (`src/lib/email/inbound.ts`) → `resolveInboundAddress` routing decision (deliver / reject / forward) → `parseRawMime` (postal-mime) → insert message + attachments → upsert contacts → `dispatchWebhooks` → `notifyUsersOfNewMessage` over the Durable Object.
+ 
+-Outbound: `src/lib/email/send.ts` / `sender.ts`, composing with mimetext and sending through the `EMAIL` send_email binding, with `outbound_jobs` rows tracking queued sends.
++Outbound: `src/lib/email/send.ts` / `sender.ts`, delivering through `src/lib/email/transports` — SMTP relay when `SMTP_URL` is set, else the `EMAIL` send_email binding (Cloudflare Email Sending, unavailable on the Free plan), else a clear "not configured" error — with `outbound_jobs` rows tracking queued sends.
+ 
+ ### Routing rules have two scopes
+ 
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/README.md work/mailflare-main/README.md
+--- orig_extract/mailflare-main/README.md	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/README.md	2026-09-20 10:06:35.554603908 +0000
+@@ -29,13 +29,13 @@
+ 
+ ## How it works
+ 
+-Mailflare runs in your Cloudflare account. Email Routing delivers incoming messages to the app, while Cloudflare's email service handles outgoing messages. Your mail data stays in your own D1 database and attachments are stored in your own R2 bucket.
++Mailflare runs in your Cloudflare account. Email Routing delivers incoming messages to the app. Your mail data, attachments, and backups all stay in your own D1 database — no R2 bucket required.
+ 
+ ## How much does it cost?
+ 
+-You can setup Mailflare and receive email for free
++You can set up Mailflare and receive email entirely on Cloudflare's Free plan.
+ 
+-A [Paid Worker](https://developers.cloudflare.com/workers/platform/pricing/) plan ($5/month) is required to send email (and it's recommend to have a smooth experience)
++Sending mail requires either an SMTP relay (set `SMTP_URL`, works on the Free plan) or Cloudflare Email Sending, which needs a [Paid Worker](https://developers.cloudflare.com/workers/platform/pricing/) plan ($5/month).
+ 
+ ## Deploy
+ 
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/docs/api.md work/mailflare-main/docs/api.md
+--- orig_extract/mailflare-main/docs/api.md	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/docs/api.md	2026-09-20 10:06:43.018302009 +0000
+@@ -36,7 +36,7 @@
+ }
+ ```
+ 
+-The dashboard composer accepts up to 10 attachments, with a 10 MB limit per file and a 20 MB combined limit. Attachment metadata is stored in D1 and file content is stored in R2. Downloads require access to the mailbox containing the message.
++The dashboard composer accepts up to 10 attachments, with a 10 MB limit per file and a 20 MB combined limit. Attachment metadata and file content are both stored in D1 (chunked blob storage), so no R2 bucket is required. Downloads require access to the mailbox containing the message.
+ 
+ ## Real-time updates
+ 
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/docs/deployment.md work/mailflare-main/docs/deployment.md
+--- orig_extract/mailflare-main/docs/deployment.md	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/docs/deployment.md	2026-09-20 10:06:48.802222701 +0000
+@@ -73,11 +73,11 @@
+ 
+ ## Database backups
+ 
+-Mailflare exports its D1 records as JSON and stores the backup files in the configured R2 bucket. A cron trigger in `wrangler.jsonc` runs daily at 02:00 UTC and applies the schedule selected under **Admin → Backups**. Manual backups run the same record export directly from the admin API.
++Mailflare exports its D1 records as JSON and stores the backup file in D1 itself, using the same chunked blob storage as message attachments — no R2 bucket is required. Backups over 50 MB are rejected with a clear error rather than risking the database's storage budget. A cron trigger in `wrangler.jsonc` runs daily at 02:00 UTC and applies the schedule selected under **Admin → Backups**. Manual backups run the same record export directly from the admin API.
+ 
+ Deploy the complete Worker with `npm run deploy` whenever the cron trigger is added or changed.
+ 
+-After upgrading an existing installation and confirming the cron trigger is active, the old Workflow can be removed with `npx wrangler workflows delete mailflare-database-backup`. Deleting it also removes its historical Workflow instances; backup files in R2 and rows in Mailflare's backup history are unaffected.
++After upgrading an existing installation and confirming the cron trigger is active, the old Workflow can be removed with `npx wrangler workflows delete mailflare-database-backup`. Deleting it also removes its historical Workflow instances; rows in Mailflare's backup history are unaffected.
+ 
+ ## Updating Mailflare
+ 
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/drizzle/migrations/0021_add_api_keys_prefix_index.sql work/mailflare-main/drizzle/migrations/0021_add_api_keys_prefix_index.sql
+--- orig_extract/mailflare-main/drizzle/migrations/0021_add_api_keys_prefix_index.sql	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/drizzle/migrations/0021_add_api_keys_prefix_index.sql	1970-01-01 00:00:00.000000000 +0000
+@@ -1,2 +0,0 @@
+--- Add index on api_keys.prefix for fast API key lookups
+-CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(prefix);
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/drizzle/migrations/0026_add_api_keys_prefix_index.sql work/mailflare-main/drizzle/migrations/0026_add_api_keys_prefix_index.sql
+--- orig_extract/mailflare-main/drizzle/migrations/0026_add_api_keys_prefix_index.sql	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/drizzle/migrations/0026_add_api_keys_prefix_index.sql	2026-09-07 13:22:30.000000000 +0000
+@@ -0,0 +1,2 @@
++-- Add index on api_keys.prefix for fast API key lookups
++CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(prefix);
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/drizzle/migrations/meta/_journal.json work/mailflare-main/drizzle/migrations/meta/_journal.json
+--- orig_extract/mailflare-main/drizzle/migrations/meta/_journal.json	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/drizzle/migrations/meta/_journal.json	2026-09-20 10:04:17.019393390 +0000
+@@ -183,6 +183,13 @@
+       "when": 1788780000000,
+       "tag": "0025_add_blob_chunks",
+       "breakpoints": true
++    },
++    {
++      "idx": 26,
++      "version": "6",
++      "when": 1788780000001,
++      "tag": "0026_add_api_keys_prefix_index",
++      "breakpoints": true
+     }
+   ]
+ }
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/env.d.ts work/mailflare-main/env.d.ts
+--- orig_extract/mailflare-main/env.d.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/env.d.ts	2026-09-20 10:03:48.963272900 +0000
+@@ -28,6 +28,12 @@
+ 	CF_API_KEY?: string;
+ 	CF_EMAIL?: string;
+ 
++	// Outbound mail: when set, SMTP relay is used instead of Cloudflare Email
++	// Sending (which requires a paid plan). Format:
++	//   smtps://user:pass@host:465  (implicit TLS)
++	//   smtp://user:pass@host:587   (STARTTLS)
++	SMTP_URL?: string;
++
+ 	TURNSTILE_SECRET_KEY?: string;
+ 
+ 	GITHUB_UPDATE_TOKEN?: string;
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/package.json work/mailflare-main/package.json
+--- orig_extract/mailflare-main/package.json	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/package.json	2026-09-20 10:07:13.738788118 +0000
+@@ -49,6 +49,9 @@
+       },
+       "CF_API_KEY": {
+         "description": "Legacy Global API Key auth only. Prefer `CF_TOKEN` for new deployments."
++      },
++      "SMTP_URL": {
++        "description": "Optional. Enables outbound mail via an SMTP relay instead of Cloudflare Email Sending (which requires a paid Workers plan). Format: smtps://user:pass@host:465 or smtp://user:pass@host:587."
+       }
+     }
+   },
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/app/(admin)/domains/DomainDnsDetails.tsx work/mailflare-main/src/app/(admin)/domains/DomainDnsDetails.tsx
+--- orig_extract/mailflare-main/src/app/(admin)/domains/DomainDnsDetails.tsx	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/app/(admin)/domains/DomainDnsDetails.tsx	2026-09-20 10:04:38.711147278 +0000
+@@ -57,13 +57,15 @@
+ 							</li>
+ 						))}
+ 						{dns.sending.length === 0 && (
+-							<li className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${domain.sendingEnabled ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
++							<li className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${domain.sendingEnabled ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
+ 								{domain.sendingEnabled ? (
+ 									<Check className="h-4 w-4 shrink-0 text-green-600" />
+ 								) : (
+-									<AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
++									<AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+ 								)}
+-								{domain.sendingEnabled ? "Email sending is configured" : "No sending DNS records found"}
++								{domain.sendingEnabled
++									? "Email sending is configured"
++									: "Cloudflare Email Sending isn't set up for this domain (unavailable on the Free plan). Outbound email requires SMTP configuration — set SMTP_URL in your Worker to send mail."}
+ 							</li>
+ 						)}
+ 					</ul>
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/app/api/backups/[id]/download/route.ts work/mailflare-main/src/app/api/backups/[id]/download/route.ts
+--- orig_extract/mailflare-main/src/app/api/backups/[id]/download/route.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/app/api/backups/[id]/download/route.ts	2026-09-20 10:06:24.194398483 +0000
+@@ -5,6 +5,7 @@
+ import { assertAdmin } from "@/lib/auth/admin";
+ import { requireUser } from "@/lib/auth/cookies";
+ import { getEnv } from "@/lib/cloudflare";
++import { getBlob } from "@/lib/storage/blob";
+ 
+ export async function GET(
+ 	request: Request,
+@@ -24,21 +25,28 @@
+ 			.where(eq(backups.id, id))
+ 			.limit(1);
+ 
+-		// Backup files are not stored in R2 in this deployment.
+-		if (!backup || backup.status !== "completed") {
++		if (!backup || backup.status !== "completed" || !backup.r2Key) {
+ 			return NextResponse.json(
+ 				{ error: "Backup file not found" },
+ 				{ status: 404 },
+ 			);
+ 		}
+ 
+-		return NextResponse.json(
+-			{
+-				error:
+-					"Stored backup downloads are disabled because this deployment does not use Cloudflare R2.",
++		const blob = await getBlob(env, backup.r2Key);
++		if (!blob) {
++			return NextResponse.json(
++				{ error: "Backup file not found" },
++				{ status: 404 },
++			);
++		}
++
++		return new NextResponse(blob.data, {
++			headers: {
++				"Content-Type": blob.contentType ?? "application/json",
++				"Content-Disposition": `attachment; filename="${backup.filename ?? `${backup.id}.json`}"`,
++				"Cache-Control": "no-store",
+ 			},
+-			{ status: 404 },
+-		);
++		});
+ 	} catch {
+ 		return NextResponse.json(
+ 			{ error: "Forbidden" },
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/backups/runner.ts work/mailflare-main/src/lib/backups/runner.ts
+--- orig_extract/mailflare-main/src/lib/backups/runner.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/lib/backups/runner.ts	2026-09-20 10:06:08.190603193 +0000
+@@ -1,44 +1,81 @@
+ import { and, eq, inArray, lt } from "drizzle-orm";
+ import { getDb } from "@/db";
+ import { backups } from "@/db/schema";
++import { deleteBlob, putBlob } from "@/lib/storage/blob";
++import { exportDatabaseRecords } from "./export";
+ import { createScheduledBackupIfDue, getBackupSettings } from "./service";
+ 
++// D1's per-database size budget is finite (a few GB on the Free plan), and a
++// backup blob is duplicated storage on top of the live tables it captured, so
++// an unbounded export could quietly exhaust the database. Fail clearly well
++// before that instead of writing a backup that might not fit.
++const MAX_BACKUP_SIZE_BYTES = 50 * 1024 * 1024;
++
++function backupBlobKey(backupId: string): string {
++	return `backups/${backupId}.json`;
++}
++
+ export async function runDatabaseBackup(
+ 	env: CloudflareEnv,
+ 	backupId: string,
+ ): Promise<void> {
+ 	const db = getDb(env);
+-
+-	const message =
+-		"Stored database backups are disabled because this deployment does not use Cloudflare R2.";
+-
++	const startedAt = new Date();
+ 	await db
+ 		.update(backups)
+-		.set({
+-			status: "failed",
+-			error: message,
+-			completedAt: new Date(),
+-		})
++		.set({ status: "running", startedAt })
+ 		.where(eq(backups.id, backupId));
+ 
+-	throw new Error(message);
++	try {
++		const data = await exportDatabaseRecords(env.DB);
++
++		if (data.byteLength > MAX_BACKUP_SIZE_BYTES) {
++			throw new Error(
++				`Backup is ${(data.byteLength / (1024 * 1024)).toFixed(1)} MB, which exceeds the ${MAX_BACKUP_SIZE_BYTES / (1024 * 1024)} MB limit for database-stored backups.`,
++			);
++		}
++
++		const key = backupBlobKey(backupId);
++		const filename = `mailflare-backup-${backupId}.json`;
++		await putBlob(env, key, data, "application/json");
++
++		await db
++			.update(backups)
++			.set({
++				status: "completed",
++				r2Key: key,
++				filename,
++				size: data.byteLength,
++				completedAt: new Date(),
++			})
++			.where(eq(backups.id, backupId));
++	} catch (error) {
++		const message = error instanceof Error ? error.message : "Backup failed";
++		await db
++			.update(backups)
++			.set({ status: "failed", error: message, completedAt: new Date() })
++			.where(eq(backups.id, backupId));
++		throw error instanceof Error ? error : new Error(message);
++	}
+ }
+ 
+ export async function runScheduledDatabaseBackup(
+ 	env: CloudflareEnv,
+ 	now: Date,
+ ): Promise<void> {
+-	// Stored scheduled backups require object storage.
+-	// R2 is intentionally disabled in this deployment, so do not create
+-	// scheduled backup records that cannot be stored.
+ 	await deleteExpiredBackups(env);
+ 
+-	// Keep the parameter in the function signature because the Worker
+-	// scheduler still calls this function.
+-	void now;
++	const backupId = await createScheduledBackupIfDue(env, now);
++	if (!backupId) return;
+ 
+-	// Prevent the imported helper from becoming part of the active flow.
+-	void createScheduledBackupIfDue;
++	try {
++		await runDatabaseBackup(env, backupId);
++	} catch (error) {
++		// runDatabaseBackup already recorded the failure on the row; the
++		// scheduler itself must not throw, or the cron trigger would report the
++		// whole invocation as failed for what is already a handled outcome.
++		console.warn("runScheduledDatabaseBackup: scheduled backup failed", error);
++	}
+ }
+ 
+ export async function deleteExpiredBackups(
+@@ -65,6 +102,11 @@
+ 		);
+ 
+ 	for (const backup of expired) {
++		if (backup.r2Key) {
++			await deleteBlob(env, backup.r2Key).catch((err) =>
++				console.warn(`deleteExpiredBackups: failed to delete blob for ${backup.id}`, err),
++			);
++		}
+ 		await db
+ 			.delete(backups)
+ 			.where(eq(backups.id, backup.id));
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/backups/service.ts work/mailflare-main/src/lib/backups/service.ts
+--- orig_extract/mailflare-main/src/lib/backups/service.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/lib/backups/service.ts	2026-09-20 10:06:17.678597475 +0000
+@@ -2,6 +2,7 @@
+ import { getDb } from "@/db";
+ import { backups, backupSettings } from "@/db/schema";
+ import { newId } from "@/lib/ids";
++import { deleteBlob } from "@/lib/storage/blob";
+ import type { BackupScheduleType } from "./types";
+ import { BACKUP_SETTINGS_ID, getUtcDayBounds, isBackupDue } from "./utils";
+ 
+@@ -120,7 +121,9 @@
+ 		throw new Error("A backup in progress cannot be deleted");
+ 	}
+ 
+-	// R2 storage is disabled, so there is no external backup object to delete.
++	if (backup.r2Key) {
++		await deleteBlob(env, backup.r2Key);
++	}
+ 	await db.delete(backups).where(eq(backups.id, id));
+ 
+ 	return true;
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/domains/provision.ts work/mailflare-main/src/lib/domains/provision.ts
+--- orig_extract/mailflare-main/src/lib/domains/provision.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/lib/domains/provision.ts	2026-09-20 10:04:00.327500025 +0000
+@@ -67,16 +67,26 @@
+ 		if (isZoneApex(normalized, zone.name)) {
+ 			sendingEnabled = false;
+ 		} else {
+-			const subs = await listSendingSubdomains(env, zone.id);
+-			const existingSub = subs.find((s) => s.name === normalized);
+-			if (existingSub) {
+-				sendingSubdomainTag = existingSub.tag;
+-				sendingEnabled = existingSub.enabled;
+-			} else {
+-				const created = await createSendingSubdomain(env, zone.id, normalized);
+-				sendingSubdomainTag = created.tag;
+-				sendingEnabled = created.enabled;
+-				changes.createdSendingSubdomainTag = created.tag;
++			try {
++				const subs = await listSendingSubdomains(env, zone.id);
++				const existingSub = subs.find((s) => s.name === normalized);
++				if (existingSub) {
++					sendingSubdomainTag = existingSub.tag;
++					sendingEnabled = existingSub.enabled;
++				} else {
++					const created = await createSendingSubdomain(env, zone.id, normalized);
++					sendingSubdomainTag = created.tag;
++					sendingEnabled = created.enabled;
++					changes.createdSendingSubdomainTag = created.tag;
++				}
++			} catch (err) {
++				// Cloudflare Email Sending is unavailable on this account/plan (e.g. the
++				// Free plan does not support it at all). Sending is optional — domain
++				// and mailbox setup must succeed regardless, with outbound mail left to
++				// SMTP configuration instead.
++				console.warn("provisionDomainOnCloudflare: Email Sending unavailable, continuing without it", err);
++				sendingEnabled = false;
++				sendingSubdomainTag = null;
+ 			}
+ 		}
+ 	}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/domains/service.ts work/mailflare-main/src/lib/domains/service.ts
+--- orig_extract/mailflare-main/src/lib/domains/service.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/lib/domains/service.ts	2026-09-20 10:04:09.118575286 +0000
+@@ -109,16 +109,26 @@
+ 	env: CloudflareEnv,
+ 	domain: typeof domains.$inferSelect,
+ ): Promise<DomainDnsView> {
+-	const [routingDns, routingSettings, sendingSubdomains] = await Promise.all([
++	const [routingDns, routingSettings] = await Promise.all([
+ 		getEmailRoutingDns(env, domain.zoneId),
+ 		getEmailRoutingSettings(env, domain.zoneId),
+-		listSendingSubdomains(env, domain.zoneId),
+ 	]);
+-	const sendingSubdomain = findSendingSubdomain(domain.hostname, sendingSubdomains);
++
++	// Email Sending is optional (unavailable on Cloudflare's Free plan) and must
++	// never break the DNS/status view for routing, which is required.
+ 	let sending: CfDnsRecord[] = [];
+-	if (sendingSubdomain?.tag) {
+-		sending = await getSendingSubdomainDns(env, domain.zoneId, sendingSubdomain.tag);
++	let sendingEnabled = false;
++	try {
++		const sendingSubdomains = await listSendingSubdomains(env, domain.zoneId);
++		const sendingSubdomain = findSendingSubdomain(domain.hostname, sendingSubdomains);
++		sendingEnabled = sendingSubdomain?.enabled ?? false;
++		if (sendingSubdomain?.tag) {
++			sending = await getSendingSubdomainDns(env, domain.zoneId, sendingSubdomain.tag);
++		}
++	} catch (err) {
++		console.warn("getDomainDns: Email Sending unavailable, continuing without it", err);
+ 	}
++
+ 	return {
+ 		routing: {
+ 			records: routingDns.records,
+@@ -126,7 +136,7 @@
+ 			status: routingSettings.status,
+ 		},
+ 		sending,
+-		sendingEnabled: sendingSubdomain?.enabled ?? false,
++		sendingEnabled,
+ 	};
+ }
+ 
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/email/send.ts work/mailflare-main/src/lib/email/send.ts
+--- orig_extract/mailflare-main/src/lib/email/send.ts	2026-09-07 13:22:30.000000000 +0000
++++ work/mailflare-main/src/lib/email/send.ts	2026-09-20 10:03:43.814374588 +0000
+@@ -9,6 +9,11 @@
+ import { createAuditLog } from "@/lib/mailboxes/audit";
+ import { storeMessageAttachments, validateAttachments } from "@/lib/email/attachments";
+ import type { AttachmentContent } from "@/lib/email/attachment-types";
++import {
++	OutboundProviderNotConfiguredError,
++	OutboundProviderPermanentError,
++	sendOutboundEmail,
++} from "@/lib/email/transports";
+ 
+ export type SendEmailInput = {
+ 	userId: string;
+@@ -70,30 +75,25 @@
+ 	});
+ 
+ 	try {
+-		const response = await env.EMAIL.send({
+-			from: sender.fromAddr,
+-			to: input.to,
+-			subject: input.subject,
+-			headers: input.headers,
+-			html: input.html,
+-			text: input.text,
+-			attachments: attachments.map((attachment) =>
+-				attachment.disposition === "inline" && attachment.contentId
+-					? {
+-							filename: attachment.filename,
+-							type: attachment.type,
+-							content: attachment.content,
+-							disposition: "inline" as const,
+-							contentId: attachment.contentId,
+-						}
+-					: {
+-							filename: attachment.filename,
+-							type: attachment.type,
+-							content: attachment.content,
+-							disposition: "attachment" as const,
+-						},
+-			),
+-		});
++		const response = await sendOutboundEmail(
++			env,
++			{
++				from: sender.fromAddr,
++				to: input.to,
++				subject: input.subject,
++				headers: input.headers,
++				html: input.html,
++				text: input.text,
++				attachments: attachments.map((attachment) => ({
++					filename: attachment.filename,
++					type: attachment.type,
++					content: attachment.content,
++					disposition: attachment.disposition ?? "attachment",
++					contentId: attachment.contentId,
++				})),
++			},
++			messageId,
++		);
+ 
+ 		await db
+ 			.update(messages)
+@@ -133,5 +133,19 @@
+ 	env: CloudflareEnv,
+ 	payload: OutboundQueueMessage,
+ ): Promise<void> {
+-	await sendEmail(env, payload);
++	try {
++		await sendEmail(env, payload);
++	} catch (err) {
++		// sendEmail already recorded the failure on the message/job and fired the
++		// message.failed webhook. A missing provider or a permanent provider
++		// rejection will never succeed on retry, so swallow it here rather than
++		// asking the queue to redeliver it (which would otherwise retry forever
++		// within the queue's configured max_retries and then land in a dead
++		// letter state for no reason). Transient errors are rethrown so the
++		// queue's normal retry/backoff still applies.
++		if (err instanceof OutboundProviderNotConfiguredError || err instanceof OutboundProviderPermanentError) {
++			return;
++		}
++		throw err;
++	}
+ }
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/email/transports/cloudflare-email.ts work/mailflare-main/src/lib/email/transports/cloudflare-email.ts
+--- orig_extract/mailflare-main/src/lib/email/transports/cloudflare-email.ts	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/src/lib/email/transports/cloudflare-email.ts	2026-09-20 09:41:26.574284832 +0000
+@@ -0,0 +1,56 @@
++import {
++	OutboundProviderNotConfiguredError,
++	OutboundProviderPermanentError,
++	type OutboundEmailInput,
++	type OutboundEmailResult,
++} from "./types";
++
++/**
++ * Sends through the Cloudflare Email Sending binding (`env.EMAIL`). This
++ * requires a sending subdomain to have been provisioned on the zone, which
++ * Cloudflare's Free plan does not support — callers should treat this as an
++ * optional, best-effort transport, not a required one.
++ */
++export async function sendViaCloudflareEmail(
++	env: CloudflareEnv,
++	input: OutboundEmailInput,
++): Promise<OutboundEmailResult> {
++	if (!env.EMAIL) {
++		throw new OutboundProviderNotConfiguredError(
++			"Cloudflare Email Sending is not configured for this Worker.",
++		);
++	}
++
++	try {
++		const response = await env.EMAIL.send({
++			from: input.from,
++			to: input.to,
++			subject: input.subject,
++			headers: input.headers,
++			html: input.html,
++			text: input.text,
++			attachments: (input.attachments ?? []).map((attachment) =>
++				attachment.disposition === "inline" && attachment.contentId
++					? {
++							filename: attachment.filename,
++							type: attachment.type,
++							content: attachment.content,
++							disposition: "inline" as const,
++							contentId: attachment.contentId,
++						}
++					: {
++							filename: attachment.filename,
++							type: attachment.type,
++							content: attachment.content,
++							disposition: "attachment" as const,
++						},
++			),
++		});
++		return { messageId: response.messageId };
++	} catch (err) {
++		// Cloudflare Email Sending failures (e.g. no sending subdomain configured
++		// on a Free plan zone) are configuration problems, not transient ones.
++		const message = err instanceof Error ? err.message : "Cloudflare Email Sending failed";
++		throw new OutboundProviderPermanentError(message);
++	}
++}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/email/transports/index.ts work/mailflare-main/src/lib/email/transports/index.ts
+--- orig_extract/mailflare-main/src/lib/email/transports/index.ts	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/src/lib/email/transports/index.ts	2026-09-20 09:41:34.914285328 +0000
+@@ -0,0 +1,54 @@
++import { sendViaCloudflareEmail } from "./cloudflare-email";
++import { parseSmtpUrl, sendViaSmtp } from "./smtp";
++import { OutboundProviderNotConfiguredError, type OutboundEmailInput, type OutboundEmailResult } from "./types";
++
++export type {
++	OutboundEmailAttachment,
++	OutboundEmailInput,
++	OutboundEmailResult,
++} from "./types";
++export {
++	OutboundProviderAuthError,
++	OutboundProviderNotConfiguredError,
++	OutboundProviderPermanentError,
++	OutboundProviderTemporaryError,
++} from "./types";
++
++export type OutboundProviderName = "smtp" | "cloudflare-email";
++
++/**
++ * Picks the outbound transport in priority order:
++ *   1. SMTP relay, when SMTP_URL is configured.
++ *   2. Cloudflare Email Sending, when the EMAIL binding is available and a
++ *      sending subdomain has actually been provisioned.
++ *   3. Otherwise, fail clearly rather than pretending to have sent anything.
++ *
++ * Mailbox creation and domain setup never depend on this — outbound delivery
++ * is resolved lazily, at send time.
++ */
++export function getConfiguredOutboundProvider(env: CloudflareEnv): OutboundProviderName | null {
++	if (env.SMTP_URL?.trim()) return "smtp";
++	if (env.EMAIL) return "cloudflare-email";
++	return null;
++}
++
++export async function sendOutboundEmail(
++	env: CloudflareEnv,
++	input: OutboundEmailInput,
++	messageId: string,
++): Promise<OutboundEmailResult> {
++	const provider = getConfiguredOutboundProvider(env);
++
++	if (provider === "smtp") {
++		const config = parseSmtpUrl(env.SMTP_URL!.trim());
++		return sendViaSmtp(config, input, messageId);
++	}
++
++	if (provider === "cloudflare-email") {
++		return sendViaCloudflareEmail(env, input);
++	}
++
++	throw new OutboundProviderNotConfiguredError(
++		"Outbound email is not configured. Set SMTP_URL to send mail from this instance.",
++	);
++}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/email/transports/mime.ts work/mailflare-main/src/lib/email/transports/mime.ts
+--- orig_extract/mailflare-main/src/lib/email/transports/mime.ts	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/src/lib/email/transports/mime.ts	2026-09-20 09:40:51.842282767 +0000
+@@ -0,0 +1,146 @@
++import type { OutboundEmailInput } from "./types";
++
++function encodeHeaderValue(value: string): string {
++	// Keep it simple: encode-word wrap only when needed (non-ASCII subjects/names).
++	if (/^[\x20-\x7e]*$/.test(value)) return value;
++	const base64 = Buffer.from(value, "utf-8").toString("base64");
++	return `=?UTF-8?B?${base64}?=`;
++}
++
++function foldHeader(name: string, value: string): string {
++	return `${name}: ${encodeHeaderValue(value)}`;
++}
++
++function arrayBufferToBase64(buffer: ArrayBuffer): string {
++	return Buffer.from(buffer).toString("base64");
++}
++
++function wrapBase64(base64: string): string {
++	const lines: string[] = [];
++	for (let i = 0; i < base64.length; i += 76) {
++		lines.push(base64.slice(i, i + 76));
++	}
++	return lines.join("\r\n");
++}
++
++function newBoundary(): string {
++	return `mf_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
++}
++
++/**
++ * Builds an RFC 5322 message (headers + body) suitable for sending as the
++ * SMTP DATA payload. Supports plain text, HTML, and attachments (including
++ * inline attachments referenced by Content-ID).
++ */
++export function buildMimeMessage(input: OutboundEmailInput, messageId: string): string {
++	const attachments = input.attachments ?? [];
++	const hasHtml = !!input.html;
++	const hasText = !!input.text || !hasHtml;
++	const inline = attachments.filter((a) => a.disposition === "inline" && a.contentId);
++	const regular = attachments.filter((a) => !(a.disposition === "inline" && a.contentId));
++
++	const headers: string[] = [
++		foldHeader("From", input.from),
++		foldHeader("To", input.to),
++		foldHeader("Subject", input.subject ?? ""),
++		`Date: ${new Date().toUTCString()}`,
++		`Message-ID: <${messageId}>`,
++		"MIME-Version: 1.0",
++	];
++	for (const [key, value] of Object.entries(input.headers ?? {})) {
++		if (/^(from|to|subject|date|message-id|mime-version|content-type)$/i.test(key)) continue;
++		headers.push(foldHeader(key, value));
++	}
++
++	// altBody: text/plain + text/html alternative (or just one of them)
++	function buildAltBody(): { contentType: string; body: string } {
++		if (hasText && hasHtml) {
++			const boundary = newBoundary();
++			const body = [
++				`--${boundary}`,
++				"Content-Type: text/plain; charset=UTF-8",
++				"Content-Transfer-Encoding: base64",
++				"",
++				wrapBase64(Buffer.from(input.text ?? "", "utf-8").toString("base64")),
++				`--${boundary}`,
++				"Content-Type: text/html; charset=UTF-8",
++				"Content-Transfer-Encoding: base64",
++				"",
++				wrapBase64(Buffer.from(input.html ?? "", "utf-8").toString("base64")),
++				`--${boundary}--`,
++			].join("\r\n");
++			return { contentType: `multipart/alternative; boundary="${boundary}"`, body };
++		}
++		if (hasHtml) {
++			return {
++				contentType: "text/html; charset=UTF-8",
++				body: wrapBase64(Buffer.from(input.html ?? "", "utf-8").toString("base64")),
++			};
++		}
++		return {
++			contentType: "text/plain; charset=UTF-8",
++			body: wrapBase64(Buffer.from(input.text ?? "", "utf-8").toString("base64")),
++		};
++	}
++
++	function attachmentPart(attachment: (typeof attachments)[number]): string {
++		const lines = [
++			`Content-Type: ${attachment.type}; name="${attachment.filename}"`,
++			`Content-Transfer-Encoding: base64`,
++			attachment.disposition === "inline" && attachment.contentId
++				? `Content-ID: <${attachment.contentId}>`
++				: null,
++			`Content-Disposition: ${attachment.disposition}; filename="${attachment.filename}"`,
++			"",
++			wrapBase64(arrayBufferToBase64(attachment.content)),
++		].filter((line): line is string => line !== null);
++		return lines.join("\r\n");
++	}
++
++	const altBody = buildAltBody();
++
++	// No attachments: single-part or alternative body only.
++	if (inline.length === 0 && regular.length === 0) {
++		headers.push(`Content-Type: ${altBody.contentType}`);
++		if (altBody.contentType.startsWith("multipart")) {
++			return [...headers, "", altBody.body].join("\r\n");
++		}
++		headers.push("Content-Transfer-Encoding: base64");
++		return [...headers, "", altBody.body].join("\r\n");
++	}
++
++	// With inline images: related wraps alternative body.
++	let relatedBody = altBody.body;
++	let relatedContentType = altBody.contentType;
++	if (inline.length > 0) {
++		const boundary = newBoundary();
++		const parts = [
++			`--${boundary}`,
++			`Content-Type: ${altBody.contentType}`,
++			"",
++			altBody.body,
++			...inline.map((a) => `--${boundary}\r\n${attachmentPart(a)}`),
++			`--${boundary}--`,
++		];
++		relatedBody = parts.join("\r\n");
++		relatedContentType = `multipart/related; boundary="${boundary}"`;
++	}
++
++	// With regular attachments: mixed wraps everything above.
++	if (regular.length > 0) {
++		const boundary = newBoundary();
++		const parts = [
++			`--${boundary}`,
++			`Content-Type: ${relatedContentType}`,
++			"",
++			relatedBody,
++			...regular.map((a) => `--${boundary}\r\n${attachmentPart(a)}`),
++			`--${boundary}--`,
++		];
++		headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
++		return [...headers, "", parts.join("\r\n")].join("\r\n");
++	}
++
++	headers.push(`Content-Type: ${relatedContentType}`);
++	return [...headers, "", relatedBody].join("\r\n");
++}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/email/transports/smtp.ts work/mailflare-main/src/lib/email/transports/smtp.ts
+--- orig_extract/mailflare-main/src/lib/email/transports/smtp.ts	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/src/lib/email/transports/smtp.ts	2026-09-20 09:41:17.846284313 +0000
+@@ -0,0 +1,237 @@
++import { buildMimeMessage } from "./mime";
++import {
++	OutboundProviderAuthError,
++	OutboundProviderPermanentError,
++	OutboundProviderTemporaryError,
++	type OutboundEmailInput,
++	type OutboundEmailResult,
++} from "./types";
++
++export type SmtpConfig = {
++	host: string;
++	port: number;
++	/** true = implicit TLS from connect (smtps://, typically port 465). */
++	implicitTls: boolean;
++	/** false only for explicit local/dev relays with no encryption at all. */
++	useStartTls: boolean;
++	username: string | null;
++	password: string | null;
++};
++
++/**
++ * Parses a connection string of the form:
++ *   smtps://user:pass@host:465   (implicit TLS)
++ *   smtp://user:pass@host:587    (STARTTLS)
++ *   smtp://user:pass@host:25     (STARTTLS if offered, otherwise plaintext)
++ */
++export function parseSmtpUrl(raw: string): SmtpConfig {
++	let url: URL;
++	try {
++		url = new URL(raw);
++	} catch {
++		throw new Error("SMTP_URL is not a valid URL");
++	}
++
++	if (url.protocol !== "smtp:" && url.protocol !== "smtps:") {
++		throw new Error("SMTP_URL must use the smtp:// or smtps:// scheme");
++	}
++	if (!url.hostname) {
++		throw new Error("SMTP_URL is missing a host");
++	}
++
++	const implicitTls = url.protocol === "smtps:";
++	const port = url.port ? Number(url.port) : implicitTls ? 465 : 587;
++
++	return {
++		host: url.hostname,
++		port,
++		implicitTls,
++		useStartTls: !implicitTls,
++		username: url.username ? decodeURIComponent(url.username) : null,
++		password: url.password ? decodeURIComponent(url.password) : null,
++	};
++}
++
++type CloudflareSocketConnect = (
++	address: { hostname: string; port: number },
++	options: { secureTransport: "on" | "off" | "starttls"; allowHalfOpen: boolean },
++) => Socket;
++
++async function getCloudflareSocketConnect(): Promise<CloudflareSocketConnect> {
++	try {
++		const moduleName = "cloudflare:sockets";
++		const sockets = (await import(
++			/* webpackIgnore: true */
++			/* @vite-ignore */
++			moduleName
++		)) as { connect: CloudflareSocketConnect };
++		return sockets.connect;
++	} catch {
++		throw new OutboundProviderTemporaryError(
++			"SMTP sending requires the Cloudflare Workers socket runtime",
++		);
++	}
++}
++
++function classifySmtpError(code: number, line: string): Error {
++	if (code === 535 || code === 534 || code === 530) {
++		return new OutboundProviderAuthError(`SMTP authentication failed: ${line}`);
++	}
++	if (code >= 500) {
++		return new OutboundProviderPermanentError(`SMTP relay rejected the message: ${line}`);
++	}
++	if (code >= 400) {
++		return new OutboundProviderTemporaryError(`SMTP relay is temporarily unavailable: ${line}`);
++	}
++	return new OutboundProviderTemporaryError(`Unexpected SMTP response: ${line}`);
++}
++
++class SmtpConnection {
++	private reader: ReadableStreamDefaultReader<Uint8Array>;
++	private writer: WritableStreamDefaultWriter<Uint8Array>;
++	private decoder = new TextDecoder();
++	private encoder = new TextEncoder();
++	private buffer = "";
++
++	constructor(private socket: Socket) {
++		this.reader = socket.readable.getReader();
++		this.writer = socket.writable.getWriter();
++	}
++
++	async reattach(socket: Socket): Promise<void> {
++		// Used after startTls() returns a new Socket wrapping the same connection.
++		this.socket = socket;
++		this.reader = socket.readable.getReader();
++		this.writer = socket.writable.getWriter();
++	}
++
++	async write(line: string): Promise<void> {
++		await this.writer.write(this.encoder.encode(`${line}\r\n`));
++	}
++
++	/** Reads one full SMTP response, following "250-" continuation lines to the final "250 ". */
++	async readResponse(): Promise<{ code: number; line: string }> {
++		const lines: string[] = [];
++		while (true) {
++			const line = await this.readLine();
++			lines.push(line);
++			const match = /^(\d{3})([ -])/.exec(line);
++			if (!match) throw new OutboundProviderTemporaryError(`Malformed SMTP response: ${line}`);
++			if (match[2] === " ") {
++				return { code: Number(match[1]), line: lines.join(" ") };
++			}
++		}
++	}
++
++	async command(line: string, expect: number | number[] = 250): Promise<{ code: number; line: string }> {
++		await this.write(line);
++		const response = await this.readResponse();
++		const expected = Array.isArray(expect) ? expect : [expect];
++		if (!expected.includes(response.code)) {
++			throw classifySmtpError(response.code, response.line);
++		}
++		return response;
++	}
++
++	async readGreeting(): Promise<void> {
++		const response = await this.readResponse();
++		if (response.code !== 220) {
++			throw classifySmtpError(response.code, response.line);
++		}
++	}
++
++	async releaseLocks(): Promise<void> {
++		this.reader.releaseLock();
++		this.writer.releaseLock();
++	}
++
++	private async readLine(): Promise<string> {
++		while (true) {
++			const index = this.buffer.indexOf("\r\n");
++			if (index >= 0) {
++				const line = this.buffer.slice(0, index);
++				this.buffer = this.buffer.slice(index + 2);
++				return line;
++			}
++			const { value, done } = await this.reader.read();
++			if (done || !value) {
++				throw new OutboundProviderTemporaryError("SMTP connection closed unexpectedly");
++			}
++			this.buffer += this.decoder.decode(value, { stream: true });
++		}
++	}
++}
++
++function dotStuff(message: string): string {
++	// RFC 5321 transparency: any line starting with "." gets an extra leading dot.
++	return message
++		.split("\r\n")
++		.map((line) => (line.startsWith(".") ? `.${line}` : line))
++		.join("\r\n");
++}
++
++function extractEmail(address: string): string {
++	const match = /<([^>]+)>/.exec(address);
++	return match ? match[1] : address.trim();
++}
++
++async function authenticate(conn: SmtpConnection, username: string, password: string): Promise<void> {
++	await conn.command("AUTH LOGIN", 334);
++	await conn.command(Buffer.from(username, "utf-8").toString("base64"), 334);
++	await conn.command(Buffer.from(password, "utf-8").toString("base64"), 235);
++}
++
++export async function sendViaSmtp(
++	config: SmtpConfig,
++	input: OutboundEmailInput,
++	messageId: string,
++): Promise<OutboundEmailResult> {
++	const connect = await getCloudflareSocketConnect();
++	let socket = connect(
++		{ hostname: config.host, port: config.port },
++		{ secureTransport: config.implicitTls ? "on" : "off", allowHalfOpen: false },
++	);
++	let conn = new SmtpConnection(socket);
++
++	try {
++		await conn.readGreeting();
++		const localHostname = "mailflare.invalid";
++		let ehlo = await conn.command(`EHLO ${localHostname}`, 250).catch(() => null);
++		if (!ehlo) ehlo = await conn.command(`HELO ${localHostname}`, 250);
++
++		if (config.useStartTls && ehlo.line.toUpperCase().includes("STARTTLS")) {
++			await conn.command("STARTTLS", 220);
++			await conn.releaseLocks();
++			socket = socket.startTls();
++			conn = new SmtpConnection(socket);
++			await conn.command(`EHLO ${localHostname}`, 250);
++		}
++
++		if (config.username && config.password) {
++			await authenticate(conn, config.username, config.password);
++		}
++
++		await conn.command(`MAIL FROM:<${extractEmail(input.from)}>`, 250);
++		await conn.command(`RCPT TO:<${extractEmail(input.to)}>`, [250, 251]);
++		await conn.command("DATA", 354);
++
++		const raw = buildMimeMessage(input, messageId);
++		await conn.write(`${dotStuff(raw)}\r\n.`);
++		const dataResponse = await conn.readResponse();
++		if (dataResponse.code !== 250) {
++			throw classifySmtpError(dataResponse.code, dataResponse.line);
++		}
++
++		await conn.command("QUIT", [221, 250]).catch(() => undefined);
++
++		// Some relays echo a provider message id in the final response (e.g. "250 2.0.0 Ok: queued as ABC123").
++		const idMatch = /queued as ([\w.-]+)/i.exec(dataResponse.line);
++		return { messageId: idMatch ? idMatch[1] : messageId };
++	} finally {
++		try {
++			await socket.close();
++		} catch {
++			// Already closed by the server.
++		}
++	}
++}
+diff -ruN --exclude node_modules --exclude .next --exclude tsconfig.tsbuildinfo orig_extract/mailflare-main/src/lib/email/transports/types.ts work/mailflare-main/src/lib/email/transports/types.ts
+--- orig_extract/mailflare-main/src/lib/email/transports/types.ts	1970-01-01 00:00:00.000000000 +0000
++++ work/mailflare-main/src/lib/email/transports/types.ts	2026-09-20 09:40:33.178281658 +0000
+@@ -0,0 +1,65 @@
++export type OutboundEmailAttachment = {
++	filename: string;
++	type: string;
++	content: ArrayBuffer;
++	disposition: "attachment" | "inline";
++	contentId?: string | null;
++};
++
++export type OutboundEmailInput = {
++	from: string;
++	to: string;
++	subject: string;
++	headers?: Record<string, string>;
++	html?: string;
++	text?: string;
++	attachments?: OutboundEmailAttachment[];
++};
++
++export type OutboundEmailResult = {
++	messageId: string;
++};
++
++/**
++ * Thrown when no outbound provider (SMTP or Cloudflare Email Sending) is
++ * configured at all. This is a setup problem, not a delivery problem — the
++ * caller should surface it as "outbound email is not configured" rather than
++ * retrying.
++ */
++export class OutboundProviderNotConfiguredError extends Error {
++	constructor(message = "No outbound email provider is configured. Set SMTP_URL to enable sending.") {
++		super(message);
++		this.name = "OutboundProviderNotConfiguredError";
++	}
++}
++
++/** Provider rejected the credentials (bad username/password/token). Retrying without a config change will not help. */
++export class OutboundProviderAuthError extends Error {
++	constructor(message: string) {
++		super(message);
++		this.name = "OutboundProviderAuthError";
++	}
++}
++
++/**
++ * A permanent failure reported by the provider (invalid recipient, message
++ * rejected, 5xx SMTP response, etc). Retrying the exact same send will not
++ * succeed.
++ */
++export class OutboundProviderPermanentError extends Error {
++	constructor(message: string) {
++		super(message);
++		this.name = "OutboundProviderPermanentError";
++	}
++}
++
++/**
++ * A transient failure (network error, 4xx SMTP response, timeout). The same
++ * send may succeed on a later attempt.
++ */
++export class OutboundProviderTemporaryError extends Error {
++	constructor(message: string) {
++		super(message);
++		this.name = "OutboundProviderTemporaryError";
++	}
++}
