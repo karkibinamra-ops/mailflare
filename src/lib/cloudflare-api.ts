@@ -211,27 +211,76 @@ export async function ensureEmailRoutingRuleToWorker(
 	const normalized = address.toLowerCase();
 	const workerName = getEmailWorkerName();
 	const rules = await listEmailRoutingRules(env, zoneId);
-	const existing = rules.find((rule) => isWorkerRouteForAddress(rule, normalized, workerName));
 
-	if (existing?.enabled) return existing;
-	if (existing?.id) {
+	// A rule may already exist for this exact recipient but point to another
+	// destination. Cloudflare rejects a second POST with code 2014
+	// (Duplicated Zone rule), so treat the recipient matcher as the unique key
+	// and reconcile the existing rule instead of blindly creating another one.
+	const existing = rules.find((rule) => isWorkerRouteForAddress(rule, normalized, workerName));
+	if (existing?.enabled && existing.id) return existing;
+
+	const existingAddressRule = rules.find((rule) =>
+		rule.matchers?.some(
+			(matcher) =>
+				matcher.type === "literal" &&
+				matcher.field === "to" &&
+				matcher.value?.toLowerCase() === normalized,
+		),
+	);
+
+	if (existingAddressRule?.id) {
 		return cfRequest<CfEmailRoutingRule>(
 			env,
-			`/zones/${zoneId}/email/routing/rules/${existing.id}`,
+			`/zones/${zoneId}/email/routing/rules/${existingAddressRule.id}`,
 			{
-				method: "PUT",
-				body: JSON.stringify({
-					actions: [{ type: "worker", value: [workerName] }],
-					enabled: true,
+					method: "PUT",
+					body: JSON.stringify({
+						actions: [{ type: "worker", value: [workerName] }],
+						enabled: true,
 					matchers: [{ type: "literal", field: "to", value: normalized }],
-					name: existing.name ?? `Route ${normalized} to ${workerName}`,
-					priority: existing.priority,
+					name: existingAddressRule.name ?? `Route ${normalized} to ${workerName}`,
+					priority: existingAddressRule.priority,
 				}),
-			},
-		);
+				},
+			);
 	}
 
-	return createEmailRoutingRuleToWorker(env, zoneId, normalized);
+	try {
+		return await createEmailRoutingRuleToWorker(env, zoneId, normalized);
+	} catch (error) {
+		// Handle a race where another request created the same rule between the
+		// list and POST calls. Re-read the rules and reconcile the duplicate.
+		if (!/code 2014|Duplicated Zone rule/i.test(error instanceof Error ? error.message : String(error))) {
+			throw error;
+		}
+
+		const refreshedRules = await listEmailRoutingRules(env, zoneId);
+		const duplicate = refreshedRules.find((rule) =>
+			rule.matchers?.some(
+				(matcher) =>
+					matcher.type === "literal" &&
+					matcher.field === "to" &&
+					matcher.value?.toLowerCase() === normalized,
+			),
+		);
+
+		if (!duplicate?.id) throw error;
+
+		return cfRequest<CfEmailRoutingRule>(
+			env,
+			`/zones/${zoneId}/email/routing/rules/${duplicate.id}`,
+			{
+					method: "PUT",
+					body: JSON.stringify({
+						actions: [{ type: "worker", value: [workerName] }],
+						enabled: true,
+					matchers: [{ type: "literal", field: "to", value: normalized }],
+					name: duplicate.name ?? `Route ${normalized} to ${workerName}`,
+					priority: duplicate.priority,
+				}),
+				},
+			);
+	}
 }
 
 export async function deleteEmailRoutingRuleForAddress(
