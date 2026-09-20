@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 		id: userId,
 		email,
 		resetEmail: firstRunParsed.data.resetEmail,
-		passwordHash: hashPassword(password),
+		passwordHash: await hashPassword(password),
 		name,
 		role: "admin",
 	});
