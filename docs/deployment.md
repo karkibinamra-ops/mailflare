@@ -73,11 +73,11 @@ Remote migrations require the target account's `database_id` in your local `wran
 
 ## Database backups
 
-Mailflare exports its D1 records as JSON and stores the backup files in the configured R2 bucket. A cron trigger in `wrangler.jsonc` runs daily at 02:00 UTC and applies the schedule selected under **Admin → Backups**. Manual backups run the same record export directly from the admin API.
+Mailflare exports its D1 records as JSON and stores the backup file in D1 itself, using the same chunked blob storage as message attachments — no R2 bucket is required. Backups over 50 MB are rejected with a clear error rather than risking the database's storage budget. A cron trigger in `wrangler.jsonc` runs daily at 02:00 UTC and applies the schedule selected under **Admin → Backups**. Manual backups run the same record export directly from the admin API.
 
 Deploy the complete Worker with `npm run deploy` whenever the cron trigger is added or changed.
 
-After upgrading an existing installation and confirming the cron trigger is active, the old Workflow can be removed with `npx wrangler workflows delete mailflare-database-backup`. Deleting it also removes its historical Workflow instances; backup files in R2 and rows in Mailflare's backup history are unaffected.
+After upgrading an existing installation and confirming the cron trigger is active, the old Workflow can be removed with `npx wrangler workflows delete mailflare-database-backup`. Deleting it also removes its historical Workflow instances; rows in Mailflare's backup history are unaffected.
 
 ## Updating Mailflare
 
