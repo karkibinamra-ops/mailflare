@@ -28,23 +28,23 @@ Do not deploy with `opennextjs-cloudflare deploy`. The deploy script deliberatel
 
 ## Architecture
 
-Next.js 16 App Router running on Cloudflare Workers via OpenNext. Drizzle ORM over D1, R2 for raw MIME, attachments, and record backups, Queues for async mail processing, a Durable Object for realtime, and a cron trigger for scheduled backups.
+Next.js 16 App Router running on Cloudflare Workers via OpenNext. Drizzle ORM over D1, with D1-backed chunked blob storage (`src/lib/storage/blob.ts`, `blob_chunks` table) for raw MIME, attachments, and record backups — no R2 dependency. Queues for async mail processing, a Durable Object for realtime, and a cron trigger for scheduled backups.
 
 ### worker.ts is the entrypoint
 
 `worker.ts` wraps the generated `.open-next/worker.js` and adds handlers Next.js cannot express:
 
 - **`fetch`** — intercepts `/api/realtime` for the WebSocket upgrade (authenticates the session cookie, then routes to `env.REALTIME.getByName(user.id)`), delegating everything else to Next.
-- **`email`** — the Cloudflare Email Routing handler. Resolves domain routing rules first (`resolveIncomingMail` in `src/lib/email/incoming.ts`) because `message.setReject()` and `message.forward()` only exist here, then applies optional account-level forwarding (loop-guarded by the `MAILFLARE_FORWARDED_HEADER`), writes raw MIME to R2, and enqueues to `INBOUND_QUEUE`. It never parses mail inline.
+- **`email`** — the Cloudflare Email Routing handler. Resolves domain routing rules first (`resolveIncomingMail` in `src/lib/email/incoming.ts`) because `message.setReject()` and `message.forward()` only exist here, then applies optional account-level forwarding (loop-guarded by the `MAILFLARE_FORWARDED_HEADER`), writes raw MIME to D1 blob storage, and enqueues to `INBOUND_QUEUE`. It never parses mail inline.
 - **`queue`** — a single consumer for both queues; `isInboundQueueMessage` and `isWebhookRetryMessage` in `worker-utils.ts` discriminate inbound mail, webhook retries, and outbound payloads. Failures `retry({ delaySeconds: 10 })`.
 
 It also re-exports `RealtimeHub`, which is why that class must live outside the Next build.
 
 ### Mail pipeline
 
-Inbound: `email` handler → R2 → queue → `processInboundMessage` (`src/lib/email/inbound.ts`) → `resolveInboundAddress` routing decision (deliver / reject / forward) → `parseRawMime` (postal-mime) → insert message + attachments → upsert contacts → `dispatchWebhooks` → `notifyUsersOfNewMessage` over the Durable Object.
+Inbound: `email` handler → D1 blob storage → queue → `processInboundMessage` (`src/lib/email/inbound.ts`) → `resolveInboundAddress` routing decision (deliver / reject / forward) → `parseRawMime` (postal-mime) → insert message + attachments → upsert contacts → `dispatchWebhooks` → `notifyUsersOfNewMessage` over the Durable Object.
 
-Outbound: `src/lib/email/send.ts` / `sender.ts`, composing with mimetext and sending through the `EMAIL` send_email binding, with `outbound_jobs` rows tracking queued sends.
+Outbound: `src/lib/email/send.ts` / `sender.ts`, delivering through `src/lib/email/transports` — SMTP relay when `SMTP_URL` is set, else the `EMAIL` send_email binding (Cloudflare Email Sending, unavailable on the Free plan), else a clear "not configured" error — with `outbound_jobs` rows tracking queued sends.
 
 ### Routing rules have two scopes
 
