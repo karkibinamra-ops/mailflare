@@ -184,6 +184,7 @@ export default function BackupsPage() {
               <div className="flex items-center gap-3 text-sm font-medium">
                 <Switch
                   checked={false}
+                  onCheckedChange={() => undefined}
                   disabled
                   aria-label="Automatic backups disabled"
                 />
