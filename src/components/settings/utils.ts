@@ -28,6 +28,7 @@ export async function updateCurrentMailboxName(id: string, displayName: string):
 	clearMailboxesCache();
 
 	return {
+		domainId: data.mailbox.domainId,
 		id: data.mailbox.id,
 		localPart: data.mailbox.localPart,
 		hostname: data.mailbox.hostname,
