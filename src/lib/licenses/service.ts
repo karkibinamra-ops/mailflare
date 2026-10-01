@@ -11,10 +11,18 @@ const LICENSE_SETTINGS_ID = "default";
 
 async function getOrCreateLicenseSettings(env: CloudflareEnv) {
 	const db = getDb(env);
+	const [existing] = await db
+		.select()
+		.from(licenseSettings)
+		.where(eq(licenseSettings.id, LICENSE_SETTINGS_ID))
+		.limit(1);
+	if (existing) return existing;
+
 	await db
 		.insert(licenseSettings)
 		.values({ id: LICENSE_SETTINGS_ID, instanceId: crypto.randomUUID() })
 		.onConflictDoNothing({ target: licenseSettings.id });
+
 	const [settings] = await db
 		.select()
 		.from(licenseSettings)
