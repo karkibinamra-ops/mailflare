@@ -69,21 +69,48 @@ export async function getBlob(
 }
 
 export async function getBlobPrefix(
-	env: CloudflareEnv,
-	key: string,
-	length?: number,
+  env: CloudflareEnv,
+  key: string,
+  length?: number,
 ): Promise<ArrayBuffer | null> {
-	const blob = await getBlob(env, key);
+  const db = getDb(env);
+  const limit = length ?? Number.POSITIVE_INFINITY;
 
-	if (!blob) {
-		return null;
-	}
+  if (!Number.isFinite(limit)) {
+    const blob = await getBlob(env, key);
+    return blob?.data ?? null;
+  }
 
-	if (length === undefined) {
-		return blob.data;
-	}
+  if (limit <= 0) return new ArrayBuffer(0);
 
-	return blob.data.slice(0, length);
+  const chunkCount = Math.max(1, Math.ceil(limit / CHUNK_SIZE));
+  const rows = await db
+    .select({
+      chunkIndex: blobChunks.chunkIndex,
+      data: blobChunks.data,
+    })
+    .from(blobChunks)
+    .where(eq(blobChunks.key, key))
+    .orderBy(asc(blobChunks.chunkIndex))
+    .limit(chunkCount);
+
+  if (rows.length === 0) return null;
+
+  const targetSize = Math.min(
+    limit,
+    rows.reduce((sum, row) => sum + row.data.length, 0),
+  );
+  const output = new Uint8Array(targetSize);
+  let offset = 0;
+
+  for (const row of rows) {
+    if (offset >= targetSize) break;
+    const take = Math.min(row.data.length, targetSize - offset);
+    output.set(row.data.subarray(0, take), offset);
+    offset += take;
+  }
+
+  return output.buffer;
 }
 
 export async function deleteBlob(
