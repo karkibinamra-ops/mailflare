@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 			.values({
 				id: userId,
 				email,
-				passwordHash: hashPassword(input.password),
+				passwordHash: await hashPassword(input.password),
 				name: username,
 				role: input.role,
 				createdByUserId: access.user!.id,
