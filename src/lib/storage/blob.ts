@@ -5,7 +5,7 @@ import { blobChunks } from "@/db/schema";
 const CHUNK_SIZE = 1_800_000;
 
 export async function putBlob(
-	env: Cloudflare.Env,
+	env: CloudflareEnv,
 	key: string,
 	data: ArrayBuffer | Uint8Array,
 	contentType?: string,
@@ -37,7 +37,7 @@ export async function putBlob(
 }
 
 export async function getBlob(
-	env: Cloudflare.Env,
+	env: CloudflareEnv,
 	key: string,
 ): Promise<{ data: ArrayBuffer; contentType: string | null } | null> {
 	const db = getDb(env);
@@ -69,7 +69,7 @@ export async function getBlob(
 }
 
 export async function getBlobPrefix(
-	env: Cloudflare.Env,
+	env: CloudflareEnv,
 	key: string,
 	length?: number,
 ): Promise<ArrayBuffer | null> {
@@ -87,7 +87,7 @@ export async function getBlobPrefix(
 }
 
 export async function deleteBlob(
-	env: Cloudflare.Env,
+	env: CloudflareEnv,
 	key: string,
 ): Promise<void> {
 	const db = getDb(env);
