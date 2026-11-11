@@ -264,12 +264,11 @@ export function ComposeForm({
 						id={`${mode}-from`}
 						value={selectedMailbox && selectedFrom ? `${selectedMailbox.id}|${selectedFrom}` : ""}
 						onChange={(event) => selectSender(event.target.value)}
-						placeholder="Select a mailbox first"
 						required
 						disabled={loadingDraft || senderOptions.length === 0}
 						className="h-8 border-0 px-0 py-1 text-sm shadow-none focus-visible:ring-0"
 					>
-						{senderOptions.length === 0 && <option value="">Select a mailbox first</option>}
+						<option value="" disabled>Select a mailbox first</option>
 						{senderOptions.map(({ mailbox, address }) => (
 							<option key={`${mailbox.id}|${address}`} value={`${mailbox.id}|${address}`}>{address}</option>
 						))}
