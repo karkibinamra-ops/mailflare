@@ -5,6 +5,13 @@
 	"compatibility_date": "2026-05-20",
 	"keep_vars": true,
 
+	"routes": [
+		{
+			"pattern": "mail.balansis.pw/*",
+			"zone_id": "8d035c7436e9063e2fe4f8b1dd5cfbe0"
+		}
+	],
+
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
@@ -75,7 +82,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "mailflare",
+			"database_name": "mailfare",
+			"database_id": "e6636c39-9463-4226-9fb8-3ccf363086a0",
 			"migrations_dir": "drizzle/migrations"
 		}
 	],
