@@ -47,23 +47,38 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
+      - name: Check deployment credentials
+        id: credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare deployment skipped. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets, then rerun this workflow."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout verified commit
+        if: steps.credentials.outputs.enabled == 'true'
         uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
 
       - name: Setup Node.js
+        if: steps.credentials.outputs.enabled == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
 
       - name: Install locked dependencies
+        if: steps.credentials.outputs.enabled == 'true'
         run: npm ci
 
       - name: Build OpenNext Worker
+        if: steps.credentials.outputs.enabled == 'true'
         run: npx opennextjs-cloudflare build
 
       - name: Deploy Worker
+        if: steps.credentials.outputs.enabled == 'true'
         run: npm run deploy:worker
 
