@@ -78,9 +78,10 @@ export function ImportMessages({ destination, sourceLabel }: ImportMessagesProps
 									<ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
 										{errors.slice(0, 5).map((item) => (
 										<li key={item}>{item}</li>
-									))}
-								</ul>
-							)}
+										))}
+									</ul>
+								) : null;
+							})()}
 						</div>
 					)}
 
