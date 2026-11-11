@@ -28,7 +28,7 @@ export function ResetPasswordClient({ token }: { token: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, newPassword: password }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) throw new Error(data.error ?? "Unable to reset password.");
       setMessage(data.message ?? "Password updated. You can sign in.");
       setPassword("");
