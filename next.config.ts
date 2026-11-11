@@ -6,12 +6,6 @@ const nextConfig: NextConfig = {
 		root: import.meta.dirname,
 	},
   allowedDevOrigins: ['mail.dev'],
-	typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete
-    // even if your project has type errors.
-    ignoreBuildErrors: true,
-	  },
 	async headers() {
 		return [
 			{
