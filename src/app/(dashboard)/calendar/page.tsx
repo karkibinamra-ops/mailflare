@@ -58,7 +58,8 @@ export default function CalendarPage() {
       },
     );
     const data = (await response.json()) as { event?: CalendarEvent; error?: string };
-    if (response.ok && data.event) {
+    const savedEvent = data.event;
+    if (response.ok && savedEvent) {
       setEvents((items) =>
         editing
           ? items.map((event) =>
@@ -74,7 +75,7 @@ export default function CalendarPage() {
                   }
                 : event,
             )
-          : [...items, data.event].sort((a, b) =>
+          : [...items, savedEvent].sort((a, b) =>
               a.startsAt.localeCompare(b.startsAt),
             ),
       );

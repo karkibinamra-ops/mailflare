@@ -39,12 +39,14 @@ async function putExternalBlob(
   bytes: Uint8Array,
   contentType?: string,
 ): Promise<void> {
+  const body = new Uint8Array(bytes.byteLength);
+  body.set(bytes);
   const response = await storageClient(env).fetch(storageUrl(env, key), {
     method: "PUT",
     headers: {
       "Content-Type": contentType || "application/octet-stream",
     },
-    body: bytes,
+    body: body.buffer,
   });
 
   if (!response.ok) {

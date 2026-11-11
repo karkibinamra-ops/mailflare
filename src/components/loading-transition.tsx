@@ -12,7 +12,7 @@ const MAXIMUM_DATA_WAIT = 10_000;
 
 export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 	const branding = useBranding();
-	const startedAt = useRef(Date.now());
+	const startedAt = useRef<number | null>(null);
 	const [progress, setProgress] = useState(8);
 	const [loaderVisible, setLoaderVisible] = useState(true);
 	const [contentVisible, setContentVisible] = useState(false);
@@ -22,6 +22,10 @@ export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 	const [dataWaitExpired, setDataWaitExpired] = useState(false);
 	const loadingIds = useRef(new Set<string>());
 	const fetchingQueries = useIsFetching();
+
+	useEffect(() => {
+		startedAt.current = Date.now();
+	}, []);
 
 	const reportLoading = useCallback((id: string, loading: boolean) => {
 		if (loading) loadingIds.current.add(id);
@@ -57,7 +61,8 @@ export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 
 	useEffect(() => {
 		if (!canComplete) return;
-		const remaining = Math.max(0, MINIMUM_LOADING_TIME - (Date.now() - startedAt.current));
+		const startTime = startedAt.current ?? Date.now();
+		const remaining = Math.max(0, MINIMUM_LOADING_TIME - (Date.now() - startTime));
 		const completeTimer = window.setTimeout(() => setProgress(100), remaining);
 		const revealTimer = window.setTimeout(() => {
 			setLoaderVisible(false);

@@ -64,30 +64,29 @@ export async function provisionDomainOnCloudflare(
 	}
 
 	if (enableSending) {
-		if (isZoneApex(normalized, zone.name)) {
-			sendingEnabled = false;
-		} else {
-			try {
-				const subs = await listSendingSubdomains(env, zone.id);
-				const existingSub = subs.find((s) => s.name === normalized);
-				if (existingSub) {
-					sendingSubdomainTag = existingSub.tag;
-					sendingEnabled = existingSub.enabled;
-				} else {
-					const created = await createSendingSubdomain(env, zone.id, normalized);
-					sendingSubdomainTag = created.tag;
-					sendingEnabled = created.enabled;
-					changes.createdSendingSubdomainTag = created.tag;
-				}
-			} catch (err) {
-				// Cloudflare Email Sending is unavailable on this account/plan (e.g. the
-				// Free plan does not support it at all). Sending is optional — domain
-				// and mailbox setup must succeed regardless, with outbound mail left to
-				// SMTP configuration instead.
-				console.warn("provisionDomainOnCloudflare: Email Sending unavailable, continuing without it", err);
-				sendingEnabled = false;
-				sendingSubdomainTag = null;
+		try {
+			// Cloudflare Email Sending can onboard the zone apex as well as a
+			// dedicated subdomain. Use the exact mailbox domain so messages from
+			// user@apex-domain remain valid senders.
+			const subs = await listSendingSubdomains(env, zone.id);
+			const existingSub = subs.find((s) => s.name === normalized);
+			if (existingSub) {
+				sendingSubdomainTag = existingSub.tag;
+				sendingEnabled = existingSub.enabled;
+			} else {
+				const created = await createSendingSubdomain(env, zone.id, normalized);
+				sendingSubdomainTag = created.tag;
+				sendingEnabled = created.enabled;
+				changes.createdSendingSubdomainTag = created.tag;
 			}
+		} catch (err) {
+			// Cloudflare Email Sending is unavailable on this account/plan (e.g. the
+			// Free plan does not support it at all). Sending is optional — domain
+			// and mailbox setup must succeed regardless, with outbound mail left to
+			// SMTP configuration instead.
+			console.warn("provisionDomainOnCloudflare: Email Sending unavailable, continuing without it", err);
+			sendingEnabled = false;
+			sendingSubdomainTag = null;
 		}
 	}
 

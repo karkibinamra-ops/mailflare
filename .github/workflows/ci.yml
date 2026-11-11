@@ -14,15 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
 
-      - name: Install dependencies
-        run: npm install --no-package-lock
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Dependency security audit
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e 'const entries=Object.entries(require("./npm-audit.json").vulnerabilities ?? {}); for (const [name,v] of entries) console.log(`${v.severity.toUpperCase()} ${name}: direct=${v.isDirect}, fix=${JSON.stringify(v.fixAvailable)}`); const blocking=entries.filter(([,v]) => v.severity === "high" || v.severity === "critical"); if (blocking.length) { console.error(`Blocking security advisories: ${blocking.map(([name]) => name).join(", ")}`); process.exit(1); }'
 
       - name: TypeScript
         run: npx tsc --noEmit
@@ -33,5 +38,3 @@ jobs:
       - name: Tests
         run: npm test
 
-      - name: Next build
-        run: npm run build

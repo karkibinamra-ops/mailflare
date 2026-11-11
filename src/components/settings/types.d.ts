@@ -84,6 +84,7 @@ export type ProfileAvatarFormProps = {
 
 export type CurrentMailboxFormResponse = {
 	mailbox?: {
+		domainId: string;
 		id: string;
 		localPart: string;
 		hostname: string;

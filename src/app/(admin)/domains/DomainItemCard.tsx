@@ -8,14 +8,19 @@ import {
   Globe2,
   Trash2,
 } from "lucide-react";
+import type { UseMutationResult } from "@tanstack/react-query";
+import type { Domain, DnsStatusSummary } from "./types";
 
-export default function DomainItemCard({ item, dns, remove, loadDns }: any) {
+type DomainItemCardProps = {
+  item: Domain;
+  dns?: DnsStatusSummary;
+  remove: UseMutationResult<void, Error, string, unknown>;
+  loadDns: (id: string) => Promise<void>;
+};
 
+export default function DomainItemCard({ item, dns, remove, loadDns }: DomainItemCardProps) {
   return (
-    <div
-      key={item.id}
-      className="flex flex-col gap-3 rounded-3xl bg-white p-5"
-    >
+    <div className="flex flex-col gap-3 rounded-3xl bg-white p-5">
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600">
           <Globe2 className="h-5 w-5" />
@@ -58,7 +63,7 @@ export default function DomainItemCard({ item, dns, remove, loadDns }: any) {
             )}
           </span>
           {dns.routing.missing.length > 0 && (
-            <span className="text-red-600 flex items-center gap-1">
+            <span className="flex items-center gap-1 text-red-600">
               <X className="h-3 w-3" />
               Missing: {dns.routing.missing.join(", ")}
             </span>

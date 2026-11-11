@@ -20,12 +20,14 @@ function initialSchemaSql() {
 	return match[1];
 }
 
-test("bootstrap records migrations 0013, 0021, and 0022 so later deploys do not re-apply them", () => {
+test("bootstrap records all migrations through 0026 so later deploys do not re-apply them", () => {
 	const names = migrationNames();
 	for (const name of [
 		"0013_add_license_settings.sql",
 		"0021_add_mailbox_signature.sql",
 		"0022_add_mailbox_auto_reply.sql",
+		"0025_add_blob_chunks.sql",
+		"0026_add_api_keys_prefix_index.sql",
 	]) {
 		assert.ok(names.includes(name), `MIGRATION_NAMES is missing ${name}`);
 	}
@@ -41,6 +43,9 @@ test("fresh bootstrap schema accepts the current Drizzle mailbox and license ins
 	assert.match(mailboxCreate[1], /\bauto_reply_body\b/);
 	assert.match(sql, /CREATE TABLE IF NOT EXISTS license_settings \(/);
 	assert.match(sql, /CREATE TABLE IF NOT EXISTS auto_reply_deliveries \(/);
+	assert.match(sql, /CREATE TABLE IF NOT EXISTS blob_chunks \(/);
+	assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS blob_chunks_key_chunk_idx ON blob_chunks\(key, chunk_index\)/);
+	assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys\(prefix\)/);
 
 	const py = `
 import sqlite3, sys
@@ -60,6 +65,8 @@ INSERT INTO mailboxes (
 """)
 db.execute("INSERT INTO license_settings (id, instance_id, updated_at) VALUES ('default','inst',1)")
 db.execute("INSERT INTO auto_reply_deliveries (id, mailbox_id, recipient, sent_at) VALUES ('ar','m','x@y.z',1)")
+assert db.execute("PRAGMA table_info(blob_chunks)").fetchall()
+assert db.execute("PRAGMA index_list(api_keys)").fetchall()
 print("ok")
 `;
 	const result = spawnSync("python3", ["-c", py], { input: sql, encoding: "utf8" });

@@ -1,4 +1,4 @@
-// @ts-ignore — generated at build time
+// @ts-expect-error generated at build time
 import { default as nextHandler } from "./.open-next/worker.js";
 import {
 	processInboundMessage,

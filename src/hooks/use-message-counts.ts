@@ -46,14 +46,15 @@ export function useMessageCounts(mailboxId?: string | null, enabled = true) {
 		}
 		function onMessageCountsDelta(event: Event) {
 			const detail = (event as CustomEvent<MessageCountsDelta>).detail;
-			if (detail?.inboxUnreadDelta === undefined) return;
+			const delta = detail?.inboxUnreadDelta;
+			if (delta === undefined) return;
 			setCounts((current) => ({
 				...current,
 				folders: {
 					...current.folders,
 					inbox: {
 						...current.folders.inbox,
-						unread: Math.max(0, current.folders.inbox.unread + detail.inboxUnreadDelta),
+						unread: Math.max(0, current.folders.inbox.unread + delta),
 					},
 				},
 			}));
