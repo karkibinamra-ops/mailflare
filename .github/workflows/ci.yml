@@ -78,6 +78,10 @@ jobs:
         if: steps.credentials.outputs.enabled == 'true'
         run: npx opennextjs-cloudflare build
 
+      - name: Apply D1 migrations
+        if: steps.credentials.outputs.enabled == 'true'
+        run: npm run db:migrate:remote
+
       - name: Deploy Worker
         if: steps.credentials.outputs.enabled == 'true'
         run: npm run deploy:worker
