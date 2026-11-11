@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import { Mail } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -68,6 +69,7 @@ export function LoginClient() {
             autoComplete="current-password"
             required
           />
+          <div className="text-right text-sm"><Link href="/forgot-password" className="font-medium underline underline-offset-4">Forgot password?</Link></div>
         </div>
         {error && (
           <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
