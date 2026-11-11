@@ -20,7 +20,7 @@ export default function HomePage() {
         >
           <img src="/icon-96.png" height={32} width={32} alt="" />
           <span className="text-base font-semibold tracking-tight">
-            "Mailflare"
+            Mailflare
           </span>
         </Link>
 
