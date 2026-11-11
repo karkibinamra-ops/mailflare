@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const [user] = await db.select({ id: users.id, resetEmail: users.resetEmail })
     .from(users).where(eq(users.email, email)).limit(1);
 
-  if (!user?.resetEmail || user.resetEmail.toLowerCase() !== "binamra.np@gmail.com") {
+  if (!user?.resetEmail) {
     return NextResponse.json(generic, { headers: { "Cache-Control": "no-store" } });
   }
 
