@@ -27,7 +27,7 @@ const sections = [
   {
     label: "Email",
     links: [
-      { href: "/mailboxes", label: "Mailboxes", icon: Mail },
+      { href: "/mailboxes", label: "Mail Admin", icon: Mail },
       { href: "/domains", label: "Domains", icon: Globe2 },
       { href: "/routing", label: "Routing", icon: Route },
       { href: "/webhooks", label: "Webhooks", icon: Webhook },
