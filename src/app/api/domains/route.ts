@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
 	const includeDns = request.nextUrl.searchParams.get("includeDns") === "true";
 
-	let dns: Record<string, DnsStatusSummary> = {};
+	const dns: Record<string, DnsStatusSummary> = {};
 	let domainViews = domains;
 	if (includeDns) {
 		const results = await Promise.allSettled(
