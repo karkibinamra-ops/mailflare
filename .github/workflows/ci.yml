@@ -24,6 +24,11 @@ jobs:
       - name: Install dependencies
         run: npm install --no-package-lock
 
+      - name: Dependency security audit
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e 'const r=require("./npm-audit.json"); for (const [name,v] of Object.entries(r.vulnerabilities ?? {})) console.log(`${v.severity.toUpperCase()} ${name}: direct=${v.isDirect}, fix=${JSON.stringify(v.fixAvailable)}`);'
+
       - name: TypeScript
         run: npx tsc --noEmit
 
