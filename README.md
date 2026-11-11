@@ -68,6 +68,12 @@ Add your Cloudflare credentials to `.dev.vars`, then open [http://localhost:3000
 - [API and integrations](docs/api.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
+## Self-hosted multi-account modification
+
+This deployment includes a local modification that enables administrator-managed user accounts on self-hosted instances without activating a paid Team license. The modification does not change or impersonate Mailflare's license status. Account creation and management remain restricted to authenticated administrators.
+
+Modified for this deployment on 2026-11-11. This modified version remains under the GNU Affero General Public License v3.0; see [LICENSE](LICENSE). The corresponding source is available in this repository: https://github.com/karkibinamra-ops/mailflare.
+
 ## License
 
 See [LICENSE](LICENSE).
