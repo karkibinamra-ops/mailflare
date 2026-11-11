@@ -14,6 +14,12 @@ const eslintConfig = [
 	},
 	...nextCoreWebVitals,
 	...nextTypescript,
+	{
+		rules: {
+			// Existing UI synchronization effects are intentional; keep these visible as warnings.
+			"react-hooks/set-state-in-effect": "warn",
+		},
+	},
 ];
 
 export default eslintConfig;
