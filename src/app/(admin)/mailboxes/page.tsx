@@ -119,7 +119,7 @@ export default function MailboxesPage() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between gap-4">
-				<h1 className="text-3xl font-medium">Mailboxes</h1>
+				<div><h1 className="text-3xl font-medium">Mail Admin</h1><p className="mt-1 text-sm text-neutral-500">Manage every mailbox, alias, and delivery address for your domains.</p></div>
 				<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 					<DialogTrigger asChild>
 						<Button>
@@ -273,6 +273,11 @@ export default function MailboxesPage() {
 									<span className="block truncate no-font-mono text-sm text-neutral-500">
 										{getMailboxAddress(mailboxWithHostname)}
 									</span>
+									{(mailbox.senderAddresses ?? []).filter((address) => address !== getMailboxAddress(mailboxWithHostname)).length > 0 && (
+										<span className="mt-1 block text-xs text-neutral-500">
+											Also receives: {(mailbox.senderAddresses ?? []).filter((address) => address !== getMailboxAddress(mailboxWithHostname)).join(", ")}
+										</span>
+									)}
 								</span>
 							</Link>
 						);
