@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 30
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: "bca3bbd7c49b42a6e9733d3c14dd9da8"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,6 @@ jobs:
       - name: Validate Cloudflare deployment credentials
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Add CLOUDFLARE_API_TOKEN to repository Actions secrets."; exit 1; }
-          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Add CLOUDFLARE_ACCOUNT_ID to repository Actions secrets."; exit 1; }
 
       - name: Install dependencies
         run: npm install --no-package-lock
