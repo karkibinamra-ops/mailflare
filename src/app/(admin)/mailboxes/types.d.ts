@@ -5,6 +5,7 @@ export type Mailbox = {
 	hasAvatar?: boolean;
 	domainId: string;
 	hostname: string;
+	senderAddresses?: string[];
 	type?: "personal" | "shared";
 	permission?: "read_only" | "send_as" | "send_on_behalf" | "full_access";
 	isPrimary?: boolean;
