@@ -25,7 +25,7 @@ export function ForgotPasswordClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await response.json();
+      const data = (await response.json()) as { error?: string; message?: string };
       if (!response.ok) throw new Error(data.error ?? "Unable to request a reset link.");
       setMessage(data.message ?? "Check your recovery inbox for a reset link.");
     } catch (err) {
